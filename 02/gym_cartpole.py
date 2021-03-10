@@ -63,11 +63,13 @@ parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
 # If you add more arguments, ReCodEx will keep them with your default values.
-parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None,
+parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=3000,
                     type=int, help="Number of epochs.")
 parser.add_argument("--model", default="gym_cartpole_model.h5",
                     type=str, help="Output model path.")
+parser.add_argument("--hidden_layer", default=100, type=int,
+                    help="Size of the hidden layer.")
 
 
 def main(args):
@@ -95,9 +97,10 @@ def main(args):
         # - binary classification with 1 output and sigmoid activation;
         # - two-class classification with 2 outputs and softmax activation.
         model = tf.keras.Sequential([
-            tf.keras.layers.Flatten(input_shape=[MNIST.H, MNIST.W, MNIST.C]),
+            tf.keras.layers.InputLayer([4]),
+            tf.keras.layers.Flatten(name="flatten"),
             tf.keras.layers.Dense(args.hidden_layer, activation=tf.nn.relu),
-            tf.keras.layers.Dense(1, activation=tf.nn.sigmoid),
+            tf.keras.layers.Dense(2, activation=tf.nn.softmax),
         ])
 
         # TODO: Prepare the model for training using the `model.compile` method.
