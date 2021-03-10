@@ -33,7 +33,7 @@
   <p align="center">
     This repository holds solution to assignments from Deep Learning course
     <br />
-    <a href="https://github.com/othneildrew/Best-README-Template"><strong>Explore the docs »</strong></a>
+    <!-- <a href="https://github.com/othneildrew/Best-README-Template"><strong>Explore the docs »</strong></a> -->
     <br />
     <br />
     <a href="https://github.com/othneildrew/Best-README-Template">View Demo</a>
@@ -74,7 +74,7 @@
 
 ## About The Project
 
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
+<!-- [![Product Name Screen Shot][product-screenshot]](https://example.com) -->
 
 ### Built With
 
@@ -84,9 +84,9 @@
 
 ### Prerequisites
 
-```sh
+<!-- ```sh
 
-```
+``` -->
 
 ### Installation
 
