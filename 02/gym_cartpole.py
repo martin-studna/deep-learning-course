@@ -63,8 +63,8 @@ parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
 # If you add more arguments, ReCodEx will keep them with your default values.
-parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=3000,
+parser.add_argument("--batch_size", default=67, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=310,
                     type=int, help="Number of epochs.")
 parser.add_argument("--model", default="gym_cartpole_model.h5",
                     type=str, help="Output model path.")
@@ -128,8 +128,9 @@ def main(args):
         if args.recodex:
             return model
         else:
-            evaluate_model(model, seed=args.seed,
-                           render=args.render, report_per_episode=True)
+            score = evaluate_model(
+                model, seed=args.seed, episodes=2, render=args.render, report_per_episode=True)
+            print("The average score was {}.".format(score))
 
 
 if __name__ == "__main__":
