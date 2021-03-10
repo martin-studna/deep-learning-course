@@ -25,7 +25,7 @@
 <br />
 <p align="center">
   <a href="https://github.com/othneildrew/Best-README-Template">
-    <img src="./logo.jpeg" alt="Logo" width="250" height="150">
+    <img src="./logo.jpeg" alt="Logo" width="350" height="250">
   </a>
 
   <h3 align="center">Deep Learning Course Homeworks</h3>
