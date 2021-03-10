@@ -103,8 +103,10 @@ def main(args):
             lr_schedule = tf.keras.optimizers.schedules.PolynomialDecay(
                 args.learning_rate, mnist.train.size / args.batch_size, end_learning_rate=args.learning_rate_final)
         elif args.decay == "exponential":
+            pocet_kroku = mnist.train.size / args.batch_size * args.epochs
+
             lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                args.learning_rate, mnist.train.size / args.batch_size, 0.002)
+                args.learning_rate, pocet_kroku,args.learning_rate_final /args.learning_rate)
 
     optimizer = None
 
@@ -125,14 +127,19 @@ def main(args):
 
     model.compile(
         optimizer=optimizer,
-        loss=tf.losses.SparseCategoricalCrossentropy(),
-        metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
+        loss=tf.losses.CategoricalCrossentropy(),
+        metrics=["accuracy"],
     )
 
     tb_callback = tf.keras.callbacks.TensorBoard(
         args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
     # Ugly hack allowing to log also test data metrics.
     tb_callback._close_writers = lambda: None
+
+    mnist.train.data["labels"] = tf.keras.utils.to_categorical(mnist.train.data["labels"])
+    mnist.dev.data["labels"] = tf.keras.utils.to_categorical(mnist.dev.data["labels"])
+    mnist.test.data["labels"] = tf.keras.utils.to_categorical(mnist.test.data["labels"])
+
     model.fit(
         mnist.train.data["images"], mnist.train.data["labels"],
         batch_size=args.batch_size, epochs=args.epochs,
@@ -145,7 +152,6 @@ def main(args):
     )
     tb_callback.on_epoch_end(
         args.epochs, {"val_test_" + metric: value for metric, value in test_logs.items()})
-
     # Return test accuracy for ReCodEx to validate
     return test_logs["accuracy"]
 
