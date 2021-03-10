@@ -94,10 +94,18 @@ def main(args):
         # the model can perform any of:
         # - binary classification with 1 output and sigmoid activation;
         # - two-class classification with 2 outputs and softmax activation.
-        model = ...
+        model = tf.keras.Sequential([
+            tf.keras.layers.Flatten(input_shape=[MNIST.H, MNIST.W, MNIST.C]),
+            tf.keras.layers.Dense(args.hidden_layer, activation=tf.nn.relu),
+            tf.keras.layers.Dense(1, activation=tf.nn.sigmoid),
+        ])
 
         # TODO: Prepare the model for training using the `model.compile` method.
-        model.compile(...)
+        model.compile(
+            optimizer=tf.optimizers.Adam(),
+            loss=tf.losses.SparseCategoricalCrossentropy(),
+            metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
+        )
 
         tb_callback = tf.keras.callbacks.TensorBoard(
             args.logdir, update_freq=100, profile_batch=0)
