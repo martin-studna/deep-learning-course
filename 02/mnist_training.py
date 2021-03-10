@@ -91,27 +91,40 @@ def main(args):
     #   rate manually by using `model.optimizer.learning_rate(model.optimizer.iterations)`,
     #   so after training this value should be `args.learning_rate_final`.
 
-    decay = None
+    lr_schedule = 0
+    if args.momentum is None:
+        args.momentum = 0
+
+    if args.learning_rate_final is None:
+        args.learning_rate_final = 0.0001
 
     if args.decay is not None:
         if args.decay == "polynomial":
-            decay = tf.keras.optimizers.schedules.PolynomialDecay(
+            lr_schedule = tf.keras.optimizers.schedules.PolynomialDecay(
                 args.learning_rate, mnist.train.size / args.batch_size, end_learning_rate=args.learning_rate_final)
         elif args.decay == "exponential":
-            decay = tf.keras.optimizers.ExponentialDecay(
+            lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
                 args.learning_rate, mnist.train.size / args.batch_size, 0.002)
 
     optimizer = None
 
     if args.optimizer == "SGD":
-        optimizer = tf.keras.optimizers.SGD(
-            lr=args.learning_rate, momentum=args.momentum, decay=decay)
+        if args.decay is not None:
+            optimizer = tf.keras.optimizers.SGD(
+                learning_rate=lr_schedule, momentum=args.momentum)
+        else:
+            optimizer = tf.keras.optimizers.SGD(
+                learning_rate=args.learning_rate, momentum=args.momentum)
     elif args.optimizer == "Adam":
-        optimizer = tf.keras.optimizers.Adam(
-            lr=args.learning_rate, decay=decay)
+        if args.decay is not None:
+            optimizer = tf.keras.optimizers.Adam(
+                learning_rate=lr_schedule)
+        else:
+            optimizer = tf.keras.optimizers.Adam(
+                learning_rate=args.learning_rate)
 
     model.compile(
-        optimizer=args.optimizer,
+        optimizer=optimizer,
         loss=tf.losses.SparseCategoricalCrossentropy(),
         metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
     )
