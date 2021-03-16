@@ -1,36 +1,29 @@
 #!/usr/bin/env python3
-from tqdm import tqdm
-from mnist import MNIST
-import tensorflow as tf
-import numpy as np
 import argparse
 import datetime
 import os
 import re
-# Report only TF errors by default
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
 
+import numpy as np
+import tensorflow as tf
+
+from mnist import MNIST
+
+from tqdm import tqdm
 
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
-parser.add_argument("--batch_size", default=64,
-                    type=int, help="Batch size.")  # 50
+parser.add_argument("--batch_size", default=64, type=int, help="Batch size.") #50
 #parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=50, type=int,
-                    help="Number of epochs.")  # 5
-parser.add_argument("--hidden_layer", default=20, type=int,
-                    help="Size of the hidden layer.")  # 100
+parser.add_argument("--epochs", default=50, type=int, help="Number of epochs.") #5
+parser.add_argument("--hidden_layer", default=20, type=int, help="Size of the hidden layer.") #100
 #parser.add_argument("--hidden_layer", default=100, type=int, help="Size of the hidden layer.")
-parser.add_argument("--learning_rate", default=0.1,
-                    type=float, help="Learning rate.")
-parser.add_argument("--recodex", default=False,
-                    action="store_true", help="Evaluation in ReCodEx.")
+parser.add_argument("--learning_rate", default=0.1, type=float, help="Learning rate.")
+parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int,
-                    help="Maximum number of threads to use.")
+parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 # If you add more arguments, ReCodEx will keep them with your default values.
-
-
 class Model(tf.Module):
     def __init__(self, args):
         self._args = args
@@ -69,11 +62,11 @@ class Model(tf.Module):
 
     def train_epoch(self, dataset):
         #counter = 0
-        for batch in tqdm(dataset.batches(self._args.batch_size)):
+        for batch in tqdm( dataset.batches(self._args.batch_size) ):
             #counter += 1
-            # if counter == 20:
+            #if counter == 20:
             #    break
-
+            
             # The batch contains
             # - batch["images"] with shape [?, MNIST.H, MNIST.W, MNIST.C]
             # - batch["labels"] with shape [?]
@@ -103,73 +96,77 @@ class Model(tf.Module):
             # or with
             #   tf.einsum("ai,aj->aij", A, B)
 
-            # loss = tf.keras.losses.categorical_crossentropy(tf.keras.utils.to_categorical(
+            #loss = tf.keras.losses.categorical_crossentropy(tf.keras.utils.to_categorical(
             #    batch["labels"], num_classes=outputs.shape[1]), outputs) / batch["labels"].shape[0]
 
-            desired_outputs = tf.keras.utils.to_categorical(
-                batch["labels"], num_classes=outputs.shape[1])
+            desired_outputs = tf.keras.utils.to_categorical(batch["labels"], num_classes=outputs.shape[1])
 
-            b2_derivative = tf.Variable(tf.zeros(len(batch), self._b1.shape))
-            W2_derivative = tf.Variable(tf.zeros(self._W2.shape))
-            I1_derivative = tf.Variable(tf.zeros(self._b1.shape))
-            W1_derivative = tf.Variable(tf.zeros(self._W1.shape))
+            #rozměry pro batch size 64 a hidden layer 20, 10 tříd
+            #b2_derivative = tf.Variable( tf.zeros( ( len(batch), self._b1.shape[0] ) ) )    #má mít rozměr 64(batch), 10(output)
+            #W2_derivative = tf.Variable(  tf.zeros( ( len(batch), self._W2.shape[0], self._W2.shape[1]    )  ) )      #má mít rozměr 64(batch), 20(hidden), 10(output) 
+            #I1_derivative = tf.Variable(  tf.zeros(  (  len(batch),  self._b1.shape[0]  )    ) )  # 64, 20
+            #W1_derivative = tf.Variable(  tf.zeros(    (  len(batch),  self._W1.shape[0],  self._W1.shape[1]   )    ) )    # 64, 746(input), 20(hidden)
 
-            b2_derivative = outputs - desired_outputs
+            b2_derivative = outputs - desired_outputs #má mít rozměr 64(batch), 10(output)
+            
+            W2_derivative = h_1[:, :, tf.newaxis] * b2_derivative[:, tf.newaxis, :]  #má mít rozměr 64(batch), 20(hidden), 10(output) 
 
+            h_1_derivative = b2_derivative  @ tf.transpose(self._W2) #má mít rozměr 64 , 20
+
+            tanh_derivative =   1 - tf.pow(  tf.tanh(mezivysledek ), 2) # 64, 20
+
+            I1_derivative_local =  h_1_derivative * tanh_derivative # 64, 20
+
+            W1_derivative = inputs[:, :, tf.newaxis] * I1_derivative_local[:, tf.newaxis, :] #64, 746 , 20
+
+
+
+
+            '''
             for i in range(len(batch["labels"])):
-                # https://stats.stackexchange.com/questions/370723/how-to-calculate-the-derivative-of-crossentropy-error-function
-                outputs_derivative = tf.subtract(
-                    outputs[i], desired_outputs[i])
-                b2_derivative.assign_add(outputs_derivative)
+                outputs_derivative = tf.subtract( outputs[i], desired_outputs[i] ) #https://stats.stackexchange.com/questions/370723/how-to-calculate-the-derivative-of-crossentropy-error-function
+                b2_derivative.assign_add( outputs_derivative   )     
                 #outputs_derivative = tf.reshape(outputs_derivative, (1, outputs_derivative.shape[0])  )
                 #W2_derivative = tf.einsum("ai,aj->aij", h_1[0], outputs_derivative)
-                W2_derivative.assign_add(tf.tensordot(
-                    h_1[i], outputs_derivative, axes=0))
+                W2_derivative.assign_add( tf.tensordot( h_1[i] , outputs_derivative, axes=0) )
 
-                outputs_derivative = tf.reshape(
-                    outputs_derivative, (1, outputs_derivative.shape[0]))
+                outputs_derivative = tf.reshape(outputs_derivative, (1, outputs_derivative.shape[0])  )
                 h_1_derivative = self._W2 @ tf.transpose(outputs_derivative)
 
-                # tohle by se nemělo přepočítávat stále znovu
-                tanh_derivative = 1 - tf.pow(tf.tanh(mezivysledek[i]), 2)
-                h_1_derivative = tf.reshape(
-                    h_1_derivative, (h_1_derivative.shape[0]))
+                tanh_derivative =   1 - tf.pow(  tf.tanh(mezivysledek[i]), 2) #tohle by se nemělo přepočítávat stále znovu
+                h_1_derivative = tf.reshape(h_1_derivative, ( h_1_derivative.shape[0]) )
 
                 #I1_derivative = h_1_derivative @ tanh_derivative
-                I1_derivative_local = h_1_derivative * tanh_derivative
-                I1_derivative.assign_add(I1_derivative_local)
+                I1_derivative_local =  h_1_derivative * tanh_derivative 
+                I1_derivative.assign_add( I1_derivative_local )
 
-                W1_derivative.assign_add(tf.tensordot(
-                    inputs[i], I1_derivative_local, axes=0))
-
+                W1_derivative.assign_add(  tf.tensordot(inputs[i], I1_derivative_local, axes=0) )
+            '''
             # TODO(sgd_backpropagation): Perform the SGD update with learning rate self._args.learning_rate
             # for the variable and computed gradient. You can modify
             # variable value with variable.assign or in this case the more
             # efficient variable.assign_sub.
 
             #W2_derivative[0] [ 0.8569202 , -0.7486297 ,  0.23134878, -0.7014691 , -2.9862432 ,   0.17736875,  1.5916749 ,  2.887221  ,  0.31432727, -1.6225191 ]
-            self._W2.assign_sub(self._args.learning_rate *
-                                W2_derivative / batch["labels"].shape[0])
-            # https://datascience.stackexchange.com/questions/20139/gradients-for-bias-terms-in-backpropagation
-            self._b2.assign_sub(self._args.learning_rate *
-                                b2_derivative / batch["labels"].shape[0])
+            self._W2.assign_sub(self._args.learning_rate * tf.math.reduce_mean( W2_derivative, axis=0) )
+            self._b2.assign_sub(self._args.learning_rate * tf.math.reduce_mean( b2_derivative, axis=0) )   #https://datascience.stackexchange.com/questions/20139/gradients-for-bias-terms-in-backpropagation
 
-            self._W1.assign_sub(self._args.learning_rate *
-                                W1_derivative / batch["labels"].shape[0])
-            self._b1.assign_sub(self._args.learning_rate *
-                                I1_derivative / batch["labels"].shape[0])
-            # s assign_sub to funguje líp???????
+            self._W1.assign_sub(self._args.learning_rate * tf.math.reduce_mean( W1_derivative, axis=0) )  
+            self._b1.assign_sub(self._args.learning_rate * tf.math.reduce_mean( I1_derivative_local, axis=0) )  
+            #s assign_sub to funguje líp???????
 
     def evaluate(self, dataset):
         # Compute the accuracy of the model prediction
         correct = 0
         for batch in dataset.batches(self._args.batch_size):
             # TODO(sgd_backpropagation): Compute the probabilities of the batch images
-            probabilities = tf.argmax(self.predict(batch["images"])[0], axis=1)
+            probabilities = tf.argmax(   self.predict(batch["images"])[0] , axis=1   )
+
 
             # TODO(sgd_backpropagation): Evaluate how many batch examples were predicted
             # correctly and increase correct variable accordingly.
-            correct += tf.math.count_nonzero(probabilities == batch["labels"])
+            correct += tf.math.count_nonzero( probabilities == batch["labels"])
+
 
         return correct / dataset.size
 
@@ -182,7 +179,7 @@ def main(args):
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
     tf.config.run_functions_eagerly(True)
-    # tf.config.set_visible_devices([], 'GPU') #odstranit!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    #tf.config.set_visible_devices([], 'GPU') #odstranit!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -220,7 +217,6 @@ def main(args):
 
     # Return test accuracy for ReCodEx to validate
     return accuracy.numpy()
-
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
