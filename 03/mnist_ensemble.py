@@ -1,24 +1,44 @@
 #!/usr/bin/env python3
+from mnist import MNIST
+import tensorflow as tf
+import numpy as np
 import argparse
 import os
 import sys
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+# Report only TF errors by default
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
-import numpy as np
-import tensorflow as tf
-
-from mnist import MNIST
 
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
-parser.add_argument("--hidden_layers", default=[100], nargs="*", type=int, help="Hidden layer sizes.")
+parser.add_argument(
+    "--hidden_layers", default=[100], nargs="*", type=int, help="Hidden layer sizes.")
 parser.add_argument("--models", default=3, type=int, help="Number of models.")
-parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
+parser.add_argument("--recodex", default=False,
+                    action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument("--threads", default=1, type=int,
+                    help="Maximum number of threads to use.")
+
 # If you add more arguments, ReCodEx will keep them with your default values.
+
+
+def evaluate(model, dataset, batch_size):
+    # Compute the accuracy of the model prediction
+    correct = 0
+    for batch in dataset.batches(batch_size):
+        # TODO: Compute the probabilities of the batch images
+        probabilities = model.predict(batch["images"])
+
+        # TODO: Evaluate how many batch examples were predicted
+        # correctly and increase `correct` variable accordingly.
+        correct += tf.math.count_nonzero(
+            tf.argmax(probabilities, axis=1) == batch["labels"])
+
+    return correct / dataset.size
+
 
 def main(args):
     # Fix random seeds and threads
@@ -34,9 +54,12 @@ def main(args):
     models = []
     for model in range(args.models):
         if args.recodex:
-            tf.keras.utils.get_custom_objects()["glorot_uniform"] = tf.initializers.GlorotUniform(seed=args.seed + model)
-            tf.keras.utils.get_custom_objects()["orthogonal"] = tf.initializers.Orthogonal(seed=args.seed + model)
-            tf.keras.utils.get_custom_objects()["uniform"] = tf.initializers.RandomUniform(seed=args.seed + model)
+            tf.keras.utils.get_custom_objects(
+            )["glorot_uniform"] = tf.initializers.GlorotUniform(seed=args.seed + model)
+            tf.keras.utils.get_custom_objects()["orthogonal"] = tf.initializers.Orthogonal(
+                seed=args.seed + model)
+            tf.keras.utils.get_custom_objects()["uniform"] = tf.initializers.RandomUniform(
+                seed=args.seed + model)
 
         models.append(tf.keras.Sequential([
             tf.keras.layers.Flatten(input_shape=[MNIST.H, MNIST.W, MNIST.C]),
@@ -50,7 +73,8 @@ def main(args):
             metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")],
         )
 
-        print("Training model {}: ".format(model + 1), end="", file=sys.stderr, flush=True)
+        print("Training model {}: ".format(model + 1),
+              end="", file=sys.stderr, flush=True)
         models[-1].fit(
             mnist.train.data["images"], mnist.train.data["labels"],
             batch_size=args.batch_size, epochs=args.epochs, verbose=0
@@ -61,7 +85,9 @@ def main(args):
     for model in range(args.models):
         # TODO: Compute the accuracy on the dev set for
         # the individual `models[model]`.
-        individual_accuracy = None
+
+        individual_accuracy = models[model].evaluate(
+            x=mnist.dev.data["images"], y=mnist.dev.data["labels"], batch_size=args.batch_size)[1]
 
         # TODO: Compute the accuracy on the dev set for
         # the ensemble `models[0:model+1].
@@ -77,12 +103,20 @@ def main(args):
         #    and instead call `model.predict` on individual models and
         #    average the results. To measure accuracy, either do it completely
         #    manually or use `tf.metrics.SparseCategoricalAccuracy`.
-        ensemble_accuracy = None
+
+        accuracies = []
+        for ensemble_model in range(model + 1):
+            accuracy = models[ensemble_model].evaluate(
+                x=mnist.dev.data["images"], y=mnist.dev.data["labels"], batch_size=args.batch_size)[1]
+            accuracies.append(accuracy)
+
+        ensemble_accuracy = sum(accuracies) / len(accuracies)
 
         # Store the accuracies
         individual_accuracies.append(individual_accuracy)
         ensemble_accuracies.append(ensemble_accuracy)
     return individual_accuracies, ensemble_accuracies
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
