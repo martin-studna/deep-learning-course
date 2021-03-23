@@ -17,7 +17,7 @@ parser.add_argument("--dropout", default=0, type=float, help="Dropout regulariza
 parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
 parser.add_argument("--hidden_layers", default=[400], nargs="*", type=int, help="Hidden layer sizes.")
 parser.add_argument("--l2", default=0, type=float, help="L2 regularization.")
-parser.add_argument("--label_smoothing", default=0, type=float, help="Label smoothing.")
+parser.add_argument("--label_smoothing", default=0.3, type=float, help="Label smoothing.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
@@ -51,12 +51,18 @@ def main(args):
     # - Dropout:
     #   Add a `tf.keras.layers.Dropout` with `args.dropout` rate after the Flatten
     #   layer and after each Dense hidden layer (but not after the output Dense layer).
+    regularizer = None
+    if args.l2 is not None:
+        regularizer = tf.keras.regularizers.L1L2(l2 = args.l2)
 
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Flatten(input_shape=[MNIST.H, MNIST.W, MNIST.C]))
+    model.add(tf.keras.layers.Dropout(args.dropout ) )
+
     for hidden_layer in args.hidden_layers:
-        model.add(tf.keras.layers.Dense(hidden_layer, activation=tf.nn.relu))
-    model.add(tf.keras.layers.Dense(MNIST.LABELS, activation=tf.nn.softmax))
+        model.add(tf.keras.layers.Dense(hidden_layer, activation=tf.nn.relu, kernel_regularizer=regularizer ))
+        model.add(tf.keras.layers.Dropout(args.dropout ) )
+    model.add(tf.keras.layers.Dense(MNIST.LABELS, kernel_regularizer=regularizer , activation=tf.nn.softmax))
 
     # TODO: Implement label smoothing.
     # Apply the given smoothing. You will need to change the
@@ -66,11 +72,30 @@ def main(args):
     # (i.e., `mnist.{train,dev,test}.data["labels"]`) from indices of the gold class
     # to a full categorical distribution (you can use either NumPy or there is
     # a helper method also in the `tf.keras.utils`).
+    
+
+    mnist.train.data["labels"] = tf.keras.utils.to_categorical(    mnist.train.data["labels"]    )
+    mnist.dev.data["labels"] = tf.keras.utils.to_categorical(    mnist.dev.data["labels"]    )
+    mnist.test.data["labels"] = tf.keras.utils.to_categorical(    mnist.test.data["labels"]    )
+
+    num_classes = mnist.train.data["labels"].shape[1]
+
+    mnist.train.data["labels"][mnist.train.data["labels"] == 1] -= args.label_smoothing
+    mnist.train.data["labels"] += args.label_smoothing / num_classes
+
+    mnist.dev.data["labels"][mnist.dev.data["labels"] == 1] -= args.label_smoothing
+    mnist.dev.data["labels"] += args.label_smoothing / num_classes
+
+    mnist.test.data["labels"][mnist.test.data["labels"] == 1] -= args.label_smoothing
+    mnist.test.data["labels"] += args.label_smoothing / num_classes
+
+
+    
 
     model.compile(
         optimizer=tf.optimizers.Adam(),
-        loss=tf.losses.SparseCategoricalCrossentropy(),
-        metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")],
+        loss=tf.losses.CategoricalCrossentropy(),
+        metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")],
     )
 
     tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
