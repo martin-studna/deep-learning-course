@@ -8,12 +8,16 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by de
 import numpy as np
 import tensorflow as tf
 
+
+# 2f67b427-a885-11e7-a937-00505601122b
+# c751264b-78ee-11eb-a1a9-005056ad4f31
+
 from mnist import MNIST
 
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
-parser.add_argument("--cnn", default=None, type=str, help="CNN architecture.")
+parser.add_argument("--cnn", default='CB-8-3-5-valid,R-[CB-8-3-1-same,CB-8-3-1-same],F,H-50', type=str, help="CNN architecture.") #default none
 parser.add_argument("--epochs", default=5, type=int, help="Number of epochs.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
@@ -26,7 +30,7 @@ class Network(tf.keras.Model):
         # TODO: Create the model. The template uses functional API, but
         # feel free to use subclassing if you want.
         inputs = tf.keras.layers.Input(shape=[MNIST.H, MNIST.W, MNIST.C])
-
+        x = inputs
         # TODO: Add CNN layers specified by `args.cnn`, which contains
         # comma-separated list of the following layers:
         # - `C-filters-kernel_size-stride-padding`: Add a convolutional layer with ReLU
@@ -46,10 +50,78 @@ class Network(tf.keras.Model):
         # You can assume the resulting network is valid; it is fine to crash if it is not.
         #
         # Produce the results in variable `hidden`.
-        hidden = ...
+        
+
+        string_layers = list(args.cnn)
+
+
+        zavorky = False
+        for i in range(len(string_layers)):
+            if string_layers[i] == '[':
+                zavorky = True
+            elif string_layers[i] == ']':
+                zavorky = False
+            
+            if string_layers[i] == ',' and zavorky:
+                string_layers[i] = ';'
+        
+        layers = "".join(string_layers).split(',')
+
+        for layer in layers:
+            params = layer.split('-')
+            if params[0] == 'C': #C-filters-kernel_size-stride-padding
+                x =  tf.keras.layers.Conv2D(int(params[1]), kernel_size=( int(params[2]), int(params[2]) ) , strides=(int(params[3]),int(params[3])  ), padding=params[4], activation='relu')(x)
+            elif params[0] == 'CB': #CB-filters-kernel_size-stride-padding
+                x =  tf.keras.layers.Conv2D(int(params[1]), kernel_size=( int(params[2]), int(params[2]) ) , strides=(int(params[3]),int(params[3]) ), padding=params[4], use_bias=False)(x)
+                x =  tf.keras.layers.BatchNormalization()(x)
+                x =  tf.keras.layers.ReLU()(x)
+            elif params[0] == 'M': #M-pool_size-stride
+                x = tf.keras.layers.MaxPool2D(pool_size=(int(params[1]), int(params[1])), strides=(int(params[2]), int(params[2])) )(x)
+            elif params[0] == 'R': #R-[C-16-3-1-same,C-16-3-1-same]
+                residual = x
+
+                layers_definition = layer[3:]
+                layers_definition = layers_definition[:-1]
+
+                res_params = layers_definition.split(';')
+
+                for res_layer in res_params:
+                    res_params = res_layer.split('-')
+                    if res_params[0] == 'C': #C-filters-kernel_size-stride-padding
+                        x =  tf.keras.layers.Conv2D(int(res_params[1]), kernel_size=( int(res_params[2]), int(res_params[2]) ) , strides=(int(res_params[3]),int(res_params[3]) ), padding=res_params[4], activation='relu')(x)
+                    elif res_params[0] == 'CB': #CB-filters-kernel_size-stride-padding
+                        x =  tf.keras.layers.Conv2D(int(res_params[1]), kernel_size=( int(res_params[2]), int(res_params[2]) ) , strides=(int(res_params[3]),int(res_params[3]) ), padding=res_params[4], use_bias=False)(x)
+                        x =  tf.keras.layers.BatchNormalization()(x)
+                        x =  tf.keras.layers.ReLU()(x)
+                    elif res_params[0] == 'M': #M-pool_size-stride
+                        x = tf.keras.layers.MaxPool2D(pool_size=(int(res_params[1]), int(res_params[1])), strides=(int(res_params[2]),int(res_params[2])) )(x)
+                #x = tf.keras.layers.Concatenate([x, residual])
+                
+                x = tf.keras.layers.Add()([x, residual])
+            elif params[0] == 'F': #F
+                x =  tf.keras.layers.Flatten()(x)
+            elif params[0] == 'H': #H-hidden_layer_size
+                x = tf.keras.layers.Dense(int(params[1]), activation='relu')(x)
+            elif params[0] == 'D': #D-dropout_rate
+                x = tf.keras.layers.Dropout(float(params[1]))(x)
+
+
+
+                
+
+
+
+
+
+                
+
+
+
+            
+
 
         # Add the final output layer
-        outputs = tf.keras.layers.Dense(MNIST.LABELS, activation=tf.nn.softmax)(hidden)
+        outputs = tf.keras.layers.Dense(MNIST.LABELS, activation=tf.nn.softmax)(x)
 
         super().__init__(inputs=inputs, outputs=outputs)
         self.compile(
