@@ -85,9 +85,7 @@ def main(args):
     for model in range(args.models):
         # TODO: Compute the accuracy on the dev set for
         # the individual `models[model]`.
-
-        individual_accuracy = models[model].evaluate(
-            x=mnist.dev.data["images"], y=mnist.dev.data["labels"], batch_size=args.batch_size)[1]
+        individual_accuracy = models[model].evaluate(mnist.dev.data['images'], mnist.dev.data['labels'])[1]
 
         # TODO: Compute the accuracy on the dev set for
         # the ensemble `models[0:model+1].
@@ -104,13 +102,12 @@ def main(args):
         #    average the results. To measure accuracy, either do it completely
         #    manually or use `tf.metrics.SparseCategoricalAccuracy`.
 
-        accuracies = []
-        for ensemble_model in range(model + 1):
-            accuracy = models[ensemble_model].evaluate(
-                x=mnist.dev.data["images"], y=mnist.dev.data["labels"], batch_size=args.batch_size)[1]
-            accuracies.append(accuracy)
-
-        ensemble_accuracy = sum(accuracies) / len(accuracies)
+        predictions = models[0].predict(mnist.dev.data['images'])
+        for i in range(1, model+1):
+            predictions += models[i].predict(mnist.dev.data['images'])
+        acc = tf.metrics.Accuracy()
+        acc.update_state(predictions.argmax(axis=1) , mnist.dev.data['labels'])
+        ensemble_accuracy = acc.result().numpy()
 
         # Store the accuracies
         individual_accuracies.append(individual_accuracy)

@@ -64,6 +64,9 @@ def main(args):
     # - Dropout:
     #   Add a `tf.keras.layers.Dropout` with `args.dropout` rate after the Flatten
     #   layer and after each Dense hidden layer (but not after the output Dense layer).
+    regularizer = None
+    if args.l2 is not None:
+        regularizer = tf.keras.regularizers.L1L2(l2=args.l2)
 
     l1l2_regularizer = None
     if args.l2 != 0:
@@ -88,6 +91,27 @@ def main(args):
     # (i.e., `mnist.{train,dev,test}.data["labels"]`) from indices of the gold class
     # to a full categorical distribution (you can use either NumPy or there is
     # a helper method also in the `tf.keras.utils`).
+
+    mnist.train.data["labels"] = tf.keras.utils.to_categorical(
+        mnist.train.data["labels"])
+    mnist.dev.data["labels"] = tf.keras.utils.to_categorical(
+        mnist.dev.data["labels"])
+    mnist.test.data["labels"] = tf.keras.utils.to_categorical(
+        mnist.test.data["labels"])
+
+    num_classes = mnist.train.data["labels"].shape[1]
+
+    mnist.train.data["labels"][mnist.train.data["labels"]
+                               == 1] -= args.label_smoothing
+    mnist.train.data["labels"] += args.label_smoothing / num_classes
+
+    mnist.dev.data["labels"][mnist.dev.data["labels"]
+                             == 1] -= args.label_smoothing
+    mnist.dev.data["labels"] += args.label_smoothing / num_classes
+
+    mnist.test.data["labels"][mnist.test.data["labels"]
+                              == 1] -= args.label_smoothing
+    mnist.test.data["labels"] += args.label_smoothing / num_classes
 
     mnist.train.data["labels"] = tf.keras.utils.to_categorical(
         mnist.train.data["labels"])
