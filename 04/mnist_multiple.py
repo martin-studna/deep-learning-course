@@ -27,14 +27,11 @@ parser.add_argument("--threads", default=1, type=int, help="Maximum number of th
 class Network(tf.keras.Model):
     def __init__(self, args):
         # Create a model with two inputs, both images of size [MNIST.H, MNIST.W, MNIST.C].
-        i1 =  tf.keras.layers.Input(shape=[MNIST.H, MNIST.W, MNIST.C])
-        i2 =  tf.keras.layers.Input(shape=[MNIST.H, MNIST.W, MNIST.C])
-        '''
+        
         images = (
             tf.keras.layers.Input(shape=[MNIST.H, MNIST.W, MNIST.C]),
             tf.keras.layers.Input(shape=[MNIST.H, MNIST.W, MNIST.C]),
         )
-        '''
 
         # TODO: The model passes each input image through the same network (with shared weights), performing
         # - convolution with 10 filters, 3x3 kernel size, stride 2, "valid" padding, ReLU activation
@@ -44,13 +41,13 @@ class Network(tf.keras.Model):
         # obtaining a 200-dimensional feature representation of each image.
 
         cmodel = tf.keras.Sequential()
-        cmodel.add(  tf.keras.layers.Conv2D(10, kernel_size=(3,3), strides=(2,2), padding='valid', activation='relu') )
-        cmodel.add(  tf.keras.layers.Conv2D(20, kernel_size=(3,3), strides=(2,2), padding='valid', activation='relu') )
+        cmodel.add(  tf.keras.layers.Conv2D(10, kernel_size=(3,3), strides=2, padding='valid', activation='relu') )
+        cmodel.add(  tf.keras.layers.Conv2D(20, kernel_size=(3,3), strides=2, padding='valid', activation='relu') )
         cmodel.add(  tf.keras.layers.Flatten() )
         cmodel.add(  tf.keras.layers.Dense(200, activation='relu') )
 
-        img1 = cmodel(i1)
-        img2 = cmodel(i2)
+        img1 = cmodel(images[0])
+        img2 = cmodel(images[1])
 
         # TODO: Then, it should produce four outputs:
         # - first, compute _direct prediction_ whether the first digit is
@@ -78,11 +75,11 @@ class Network(tf.keras.Model):
             "direct_prediction": dp,
             "digit_1": d1,
             "digit_2": d2,
-            "indirect_prediction": tf.argmax(d1) > tf.argmax(d2) ,
+            "indirect_prediction": tf.argmax(d1, axis=1) >= tf.argmax(d2, axis=1) ,
         }
 
         # Finally, construct the model.
-        super().__init__(inputs=[i1,i2], outputs=outputs)
+        super().__init__(inputs=[images], outputs=outputs)
 
         # Note that for historical reasons, names of a functional model outputs
         # (used for displayed losses/metric names) are derived from the name of
@@ -103,19 +100,18 @@ class Network(tf.keras.Model):
                 "digit_2": tf.keras.losses.SparseCategoricalCrossentropy(),
             },
             metrics={
-                "direct_prediction": ["accuracy"],
-                "indirect_prediction": ["accuracy"],
+                "direct_prediction": tf.metrics.BinaryAccuracy("accuracy"),
+                "indirect_prediction": tf.metrics.BinaryAccuracy("accuracy"),
             },
         )
 
-        self.tb_callback = None
-        #self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
-        #self.tb_callback._close_writers = lambda: None # A hack allowing to keep the writers open.
+        self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, histogram_freq=1, update_freq=100, profile_batch=0)
+        self.tb_callback._close_writers = lambda: None # A hack allowing to keep the writers open.
 
     # Create an appropriate dataset using the MNIST data.
     def create_dataset(self, mnist_dataset, args, training=False):
         # Start by using the original MNIST data
-        dataset = tf.data.Dataset.from_tensor_slices((mnist_dataset.data["images"], mnist_dataset.data["labels"]))
+        dataset = tf.data.Dataset.from_tensor_slices((mnist_dataset.data["images"], mnist_dataset.data["labels"]   ))
 
         # TODO: If `training`, shuffle the data with `buffer_size=10000` and `seed=args.seed`
         if training:
@@ -128,14 +124,13 @@ class Network(tf.keras.Model):
         # - `output` being a dictionary with keys digit_1, digit_2, direct_prediction
         #   and indirect_prediction.
         def create_element(images, labels):
-            #print(images.shape)
-            #return images, labels
-            return ((images[0], images[1]), {'digit_1': labels[0], 'digit_2': labels[1], 'direct_prediction': labels[0]>labels[1], 'indirect_prediction': labels[0]>labels[1]})
+            return ((images[0], images[1]), {'digit_1': labels[0],
+             'digit_2': labels[1], 
+             'direct_prediction': tf.cast(labels[0]>=labels[1], dtype=tf.float32), 'indirect_prediction': labels[0]>=labels[1]})
         dataset = dataset.map(create_element)
 
         # TODO: Create batches of size `args.batch_size`
         dataset = dataset.batch(args.batch_size)
-        #dataset = dataset.batch(1)
         return dataset
 
 def main(args):
@@ -144,6 +139,8 @@ def main(args):
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
+    #tf.config.run_functions_eagerly(True)
+
     if args.recodex:
         tf.keras.utils.get_custom_objects()["glorot_uniform"] = tf.initializers.GlorotUniform(seed=args.seed)
         tf.keras.utils.get_custom_objects()["orthogonal"] = tf.initializers.Orthogonal(seed=args.seed)
@@ -168,7 +165,7 @@ def main(args):
     test = network.create_dataset(mnist.test, args)
 
     # Train
-    network.fit(train, epochs=args.epochs, validation_data=dev)
+    network.fit(train, epochs=args.epochs, validation_data=dev, callbacks=[network.tb_callback])
 
     # Compute test set metrics and return them
     test_logs = network.evaluate(test, return_dict=True)
