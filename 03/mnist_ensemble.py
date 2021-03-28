@@ -9,6 +9,10 @@ import sys
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 
+# 2f67b427-a885-11e7-a937-00505601122b
+# c751264b-78ee-11eb-a1a9-005056ad4f31
+
+
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
@@ -85,7 +89,8 @@ def main(args):
     for model in range(args.models):
         # TODO: Compute the accuracy on the dev set for
         # the individual `models[model]`.
-        individual_accuracy = models[model].evaluate(mnist.dev.data['images'], mnist.dev.data['labels'])[1]
+        individual_accuracy = models[model].evaluate(
+            mnist.dev.data['images'], mnist.dev.data['labels'])[1]
 
         # TODO: Compute the accuracy on the dev set for
         # the ensemble `models[0:model+1].
@@ -106,7 +111,7 @@ def main(args):
         for i in range(1, model+1):
             predictions += models[i].predict(mnist.dev.data['images'])
         acc = tf.metrics.Accuracy()
-        acc.update_state(predictions.argmax(axis=1) , mnist.dev.data['labels'])
+        acc.update_state(predictions.argmax(axis=1), mnist.dev.data['labels'])
         ensemble_accuracy = acc.result().numpy()
 
         # Store the accuracies
