@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 from uppercase_data import UppercaseData
 import tensorflow as tf
 import numpy as np
