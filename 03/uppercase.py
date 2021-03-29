@@ -91,7 +91,7 @@ PARAMS = {
     'epochs': epochs,                 
          }
 neptune.create_experiment(params=PARAMS,abort_callback=lambda: run_shutdown_logic_and_exit())
-neptune.send_artifact('uppercase.ipynb')
+neptune.send_artifact('uppercase.py')
 
 #13 epoch
 from tensorflow.keras.callbacks import Callback
