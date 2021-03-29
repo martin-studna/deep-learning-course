@@ -130,3 +130,5 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+03/mnist.npz
+03/uppercase_data.zip
