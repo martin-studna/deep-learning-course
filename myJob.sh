@@ -30,6 +30,7 @@ test -n "$SCRATCHDIR" || { echo >&2 "Variable SCRATCHDIR is not set!"; exit 1; }
 # copy input file "h2o.com" to scratch directory
 # if the copy operation fails, issue error message and exit
 cp $DATADIR/uppercase.py  $SCRATCHDIR || { echo >&2 "Error while copying input file(s)!"; exit 2; }
+cp $DATADIR/uppercase_data.py  $SCRATCHDIR || { echo >&2 "Error while copying input file(s)!"; exit 2; }
 
 
 # move into scratch directory
