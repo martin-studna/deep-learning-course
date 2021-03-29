@@ -15,15 +15,15 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 # TODO: Set reasonable values for the hyperparameters, notably
 # for `alphabet_size` and `window` and others.
 parser = argparse.ArgumentParser()
-parser.add_argument("--alphabet_size", default=32, type=int,
+parser.add_argument("--alphabet_size", default=62, type=int,
                     help="If nonzero, limit alphabet to this many most frequent chars.")
 parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=2,
+parser.add_argument("--epochs", default=30,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
-parser.add_argument("--window", default=5, type=int,
+parser.add_argument("--window", default=4, type=int,
                     help="Window size to use.")
 parser.add_argument("--dropout", default=0, type=float,
                     help="Dropout regularization.")
@@ -31,7 +31,7 @@ parser.add_argument("--l2", default=0, type=float, help="L2 regularization.")
 parser.add_argument("--label_smoothing", default=0,
                     type=float, help="Label smoothing.")
 parser.add_argument(
-    "--hidden_layers", default=[2], nargs="*", type=int, help="Hidden layer sizes.")
+    "--hidden_layers", default=[400], nargs="*", type=int, help="Hidden layer sizes.")
 
 
 def main(args):
@@ -100,8 +100,8 @@ def main(args):
     )
 
     labels = tf.keras.utils.to_categorical(uppercase_data.train.data["labels"])
-    # model.fit(uppercase_data.train.data["windows"],
-    #           labels, batch_size=args.batch_size, epochs=args.epochs)
+    model.fit(uppercase_data.train.data["windows"],
+              labels, batch_size=args.batch_size, epochs=args.epochs)
 
     # TODO: Generate correctly capitalized test set.
     # Use `uppercase_data.test.text` as input, capitalize suitable characters,
@@ -116,7 +116,8 @@ def main(args):
 
     for i in range(len(predictions)):
         if predictions[i][1] >= 0.5:
-            text_result[i] = text_result[i].upper()
+            if text_result[i] == text_result[i].upper().lower():
+                text_result[i] = text_result[i].upper()
 
     text_result = "".join(text_result)
     with open("uppercase_test.txt", "w", encoding="utf-8") as predictions_file:
