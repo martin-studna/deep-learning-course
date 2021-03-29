@@ -15,7 +15,7 @@ DATADIR=/storage/brno2/home/martin-studna/testdirectory # substitute username an
 #echo "$PBS_JOBID is running on node `hostname -f` in a scratch directory $SCRATCHDIR" >> $DATADIR/jobs_info.txt
 
 
-export NEPTUNE_API_TOKEN="eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiYWZiNjk2N2EtNTliMC00YjE3LTg0MzctYmNmZmIwMmQ0NzAxIn0="
+export NEPTUNE_API_TOKEN=""
 
 #loads the Gaussian's application modules, version 03
 module add python/3.8.0-gcc-rab6t
@@ -29,8 +29,8 @@ test -n "$SCRATCHDIR" || { echo >&2 "Variable SCRATCHDIR is not set!"; exit 1; }
 
 # copy input file "h2o.com" to scratch directory
 # if the copy operation fails, issue error message and exit
-cp $DATADIR/uppercase.py  $SCRATCHDIR || { echo >&2 "Error while copying input file(s)!"; exit 2; }
-cp $DATADIR/uppercase_data.py  $SCRATCHDIR || { echo >&2 "Error while copying input file(s)!"; exit 2; }
+cp $DATADIR/*  $SCRATCHDIR || { echo >&2 "Error while copying input file(s)!"; exit 2; }
+
 
 
 # move into scratch directory
