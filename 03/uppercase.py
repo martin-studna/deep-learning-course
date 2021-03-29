@@ -8,9 +8,9 @@ import datetime
 import os
 import re
 
-import neptune
+#import neptune
 
-neptune.init(project_qualified_name='amdalifuk/c10', api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiZjkxYTA4NzYtMzk5OS00NDFmLTlmMWItNGNhNjU5NmQ1NDMxIn0=') # add your 
+#neptune.init(project_qualified_name='amdalifuk/c10', api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiZjkxYTA4NzYtMzk5OS00NDFmLTlmMWItNGNhNjU5NmQ1NDMxIn0=') # add your 
 
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
@@ -91,10 +91,11 @@ PARAMS = {
     'alphabet_size': alphabet_size,
     'epochs': epochs,                 
          }
-neptune.create_experiment(params=PARAMS,abort_callback=lambda: run_shutdown_logic_and_exit())
-neptune.send_artifact('uppercase.py')
+#neptune.create_experiment(params=PARAMS,abort_callback=lambda: run_shutdown_logic_and_exit())
+#neptune.send_artifact('uppercase.py')
 
 #13 epoch
+'''
 from tensorflow.keras.callbacks import Callback
 class CustomCallback(Callback):        
     def on_epoch_end(self, epoch, logs=None):
@@ -105,9 +106,12 @@ class CustomCallback(Callback):
         if 'val_loss' in logs:
             neptune.log_metric('val_loss', logs['val_loss'])
             neptune.log_metric('1-val_accuracy', 1-logs['val_accuracy'])
-            
+'''            
+#model.fit(uppercase_data.train.data["windows"], labels, batch_size=batch_size, shuffle=True,
+#          validation_data=(uppercase_data.dev.data["windows"], labels_dev), epochs=epochs, callbacks=[CustomCallback()])
+
 model.fit(uppercase_data.train.data["windows"], labels, batch_size=batch_size, shuffle=True,
-          validation_data=(uppercase_data.dev.data["windows"], labels_dev), epochs=epochs, callbacks=[CustomCallback()])
+          validation_data=(uppercase_data.dev.data["windows"], labels_dev), epochs=epochs)
 
 
 predictions = model.predict(uppercase_data.test.data["windows"])
