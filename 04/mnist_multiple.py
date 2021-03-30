@@ -66,16 +66,17 @@ class Network(tf.keras.Model):
         dp = tf.keras.layers.Dense(200, activation='relu')(dp)
         dp = tf.keras.layers.Dense(1, activation='sigmoid')(dp)
 
-        d1 = tf.keras.layers.Dense(10, activation='softmax')(img1)
-        d2 = tf.keras.layers.Dense(10, activation='softmax')(img2)
+        klas_vrstva = tf.keras.layers.Dense(10, activation='softmax')
+        i1 = klas_vrstva(img1)
+        i2 = klas_vrstva(img2)
 
         
 
         outputs = {
             "direct_prediction": dp,
-            "digit_1": d1,
-            "digit_2": d2,
-            "indirect_prediction": tf.argmax(d1, axis=1) >= tf.argmax(d2, axis=1) ,
+            "digit_1": i1,
+            "digit_2": i2,
+            "indirect_prediction": tf.argmax(i1, axis=1) > tf.argmax(i2, axis=1) ,
         }
 
         # Finally, construct the model.
@@ -115,7 +116,7 @@ class Network(tf.keras.Model):
 
         # TODO: If `training`, shuffle the data with `buffer_size=10000` and `seed=args.seed`
         if training:
-            dataset.shuffle(10000, seed=args.seed)
+            dataset = dataset.shuffle(10000, seed=args.seed)
         # TODO: Combine pairs of examples by creating batches of size 2
         dataset = dataset.batch(2)
         # TODO: Map pairs of images to elements suitable for our model. Notably,
@@ -126,7 +127,7 @@ class Network(tf.keras.Model):
         def create_element(images, labels):
             return ((images[0], images[1]), {'digit_1': labels[0],
              'digit_2': labels[1], 
-             'direct_prediction': tf.cast(labels[0]>=labels[1], dtype=tf.float32), 'indirect_prediction': labels[0]>=labels[1]})
+             'direct_prediction': tf.cast(labels[0]>labels[1], dtype=tf.float32), 'indirect_prediction': labels[0]>labels[1]})
         dataset = dataset.map(create_element)
 
         # TODO: Create batches of size `args.batch_size`
