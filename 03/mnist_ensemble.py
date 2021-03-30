@@ -9,6 +9,10 @@ import sys
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 
+# 2f67b427-a885-11e7-a937-00505601122b
+# c751264b-78ee-11eb-a1a9-005056ad4f31
+
+
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
