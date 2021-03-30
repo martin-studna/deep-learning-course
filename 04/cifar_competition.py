@@ -106,8 +106,5 @@ model.summary()
 # with open(os.path.join(args.logdir, "cifar_competition_test.txt"), "w", encoding="utf-8") as predictions_file:
 #     for probs in model.predict(cifar.test.data["images"], batch_size=args.batch_size):
 #         print(np.argmax(probs), file=predictions_file)
-
-train_generator = tf.keras.preprocessing.image.ImageDataGenerator( rotation_range=5, zoom_range=0.1, width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
-
-model.fit(train_generator.flow(cifar.train.data["images"], cifar.train.data["labels"], batch_size=512),
-          epochs=52, validation_data=(cifar.dev.data["images"], cifar.dev.data["labels"]), shuffle=True)
+model.fit(cifar.train.data["images"], cifar.train.data["labels"], batch_size=512 ,
+         epochs=35, validation_data=(cifar.dev.data["images"], cifar.dev.data["labels"]), shuffle=True )
