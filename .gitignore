@@ -130,9 +130,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-*.npz
-03/.vs/
 
+*.npz
 logs
 03/mnist.npz
 03/uppercase_data.zip
+uppercase_data.zip
+03/.vs/
