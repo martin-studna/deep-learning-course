@@ -1,22 +1,42 @@
 #!/usr/bin/env python3
+import re
 from cifar10 import CIFAR10
 import tensorflow as tf
 import numpy as np
 import argparse
 import datetime
 import os
-import re
+from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import Flatten
+from callback import NeptuneCallback
+from os import environ
+import neptune
+neptune.init(project_qualified_name='amdalifuk/cifar')
+
+environ["KERAS_BACKEND"] = "plaidml.keras.backend"
+# 2f67b427-a885-11e7-a937-00505601122b
+# c751264b-78ee-11eb-a1a9-005056ad4f31
+
 # Report only TF errors by default
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
 
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=40, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=5,
+parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
+parser.add_argument("--learning_rate", default=0.001,
+                    type=int, help="Batch size.")
+parser.add_argument("--momentum", default=0.9, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=60,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int,
+parser.add_argument("--threads", default=16, type=int,
                     help="Maximum number of threads to use.")
 
 
@@ -26,6 +46,13 @@ def main(args):
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
+
+    neptune.create_experiment(params={
+        'batch_size': args.batch_size,
+        'learning_rate': args.learning_rate,
+        'epochs': args.epochs,
+        'threads': args.threads
+    })
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -39,23 +66,45 @@ def main(args):
     cifar = CIFAR10()
     # TODO: Create the model and train it
     model = tf.keras.Sequential()
-    model.add(tf.keras.layers.InputLayer(
-        input_shape=[32, 32, 3], batch_size=args.batch_size))
-    model.add(tf.keras.layers.Conv2D(
-        20, [3, 3], strides=2, padding='valid', activation='relu'))
-    model.add(tf.keras.layers.Conv2D(
-        10, [3, 3], strides=2, padding='valid', activation='relu'))
-    model.add(tf.keras.layers.Flatten())
-    model.add(tf.keras.layers.Dense(10, activation='softmax'))
+    model.add(Conv2D(32, (3, 3), activation='relu',
+              kernel_initializer='he_uniform', padding='same', input_shape=(32, 32, 3)))
+    model.add(BatchNormalization())
+    model.add(Conv2D(32, (3, 3), activation='relu',
+                     kernel_initializer='he_uniform', padding='same'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.2))
+    model.add(Conv2D(64, (3, 3), activation='relu',
+                     kernel_initializer='he_uniform', padding='same'))
+    model.add(BatchNormalization())
+    model.add(Conv2D(64, (3, 3), activation='relu',
+                     kernel_initializer='he_uniform', padding='same'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.3))
+    model.add(Conv2D(128, (3, 3), activation='relu',
+                     kernel_initializer='he_uniform', padding='same'))
+    model.add(BatchNormalization())
+    model.add(Conv2D(128, (3, 3), activation='relu',
+                     kernel_initializer='he_uniform', padding='same'))
+    model.add(BatchNormalization())
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Dropout(0.4))
+    model.add(Flatten())
+    model.add(Dense(128, activation='relu',
+                    kernel_initializer='he_uniform'))
+    model.add(BatchNormalization())
+    model.add(Dropout(0.5))
+    model.add(Dense(10, activation='softmax'))
 
     model.compile(
-        optimizer=tf.optimizers.Adam(),
+        optimizer=tf.optimizers.Adam(learning_rate=args.learning_rate),
         loss=tf.losses.SparseCategoricalCrossentropy(),
         metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")]
     )
 
     model.fit(cifar.train.data["images"], cifar.train.data["labels"], batch_size=args.batch_size,
-              epochs=args.epochs, validation_data=(cifar.dev.data["images"], cifar.dev.data["labels"]), shuffle=True)
+              epochs=args.epochs, validation_data=(cifar.dev.data["images"], cifar.dev.data["labels"]), shuffle=True, callbacks=[NeptuneCallback()])
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     # with open(os.path.join(args.logdir, "cifar_competition_test.txt"), "w", encoding="utf-8") as predictions_file:

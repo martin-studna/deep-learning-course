@@ -1,5 +1,5 @@
 {
-  "python.pythonPath": "/Users/cetis/School/deep-learning/venv/bin/python3.7",
+  "python.pythonPath": "venv/bin/python",
   "search.exclude": {
     "**/.venv": true
   }

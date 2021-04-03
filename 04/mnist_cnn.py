@@ -104,7 +104,6 @@ class Network(tf.keras.Model):
                     elif res_params[0] == 'M':  # M-pool_size-stride
                         x = tf.keras.layers.MaxPool2D(pool_size=(int(res_params[1]), int(
                             res_params[1])), strides=(int(res_params[2]), int(res_params[2])))(x)
-                #x = tf.keras.layers.Concatenate([x, residual])
 
                 x = tf.keras.layers.Add()([x, residual])
             elif params[0] == 'F':  # F
