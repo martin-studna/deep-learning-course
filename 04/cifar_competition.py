@@ -34,7 +34,7 @@ parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
 parser.add_argument("--learning_rate", default=0.001,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=60,
+parser.add_argument("--epochs", default=300,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=16, type=int,
