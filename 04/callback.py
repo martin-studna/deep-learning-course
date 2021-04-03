@@ -1,10 +1,9 @@
 from tensorflow.keras.callbacks import Callback
 
 import neptune
-neptune.init(project_qualified_name='amdalifuk/cifar')  # add your
 
 
-class NeptuneCallback(object, Callback):
+class NeptuneCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
 
         neptune.log_metric('loss', logs['loss'])

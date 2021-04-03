@@ -15,9 +15,10 @@ from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Flatten
 from callback import NeptuneCallback
-from os import environ
 import neptune
+from os import environ
 neptune.init(project_qualified_name='amdalifuk/cifar')
+
 
 environ["KERAS_BACKEND"] = "plaidml.keras.backend"
 # 2f67b427-a885-11e7-a937-00505601122b
