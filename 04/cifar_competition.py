@@ -9,6 +9,7 @@ import os
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import MaxPooling2D
 from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import BatchNormalization
@@ -34,7 +35,7 @@ parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
 parser.add_argument("--learning_rate", default=0.001,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=300,
+parser.add_argument("--epochs", default=400,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=16, type=int,
@@ -104,8 +105,14 @@ def main(args):
         metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")]
     )
 
-    model.fit(cifar.train.data["images"], cifar.train.data["labels"], batch_size=args.batch_size,
-              epochs=args.epochs, validation_data=(cifar.dev.data["images"], cifar.dev.data["labels"]), shuffle=True, callbacks=[NeptuneCallback()])
+    datagen = ImageDataGenerator(
+        width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
+
+    it_train = datagen.flow(
+        cifar.train.data["images"], cifar.train.data["labels"], batch_size=args.batch_size)
+    steps = int(cifar.train.data["images"].shape[0] / 64)
+    model.fit(it_train, steps_per_epoch=steps, epochs=args.epochs, verbose=0, callbacks=[NeptuneCallback()], validation_data=(
+        cifar.dev.data["images"], cifar.dev.data["labels"]))
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     # with open(os.path.join(args.logdir, "cifar_competition_test.txt"), "w", encoding="utf-8") as predictions_file:
