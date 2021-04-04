@@ -113,11 +113,13 @@ def main(args):
     model.compile(
         optimizer=tf.optimizers.Adam(
             learning_rate=args.learning_rate),
-        loss=tf.losses.SparseCategoricalCrossentropy(),
-        metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")]
+        loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
+        metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
-    model.fit(cifar.train.data["images"], cifar.train.data["labels"], epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
-        cifar.dev.data["images"], cifar.dev.data["labels"]))
+    y = tf.keras.utils.to_categorical(cifar.train.data["labels"])
+    y_dev = tf.keras.utils.to_categorical(cifar.dev.data["labels"])
+    model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
+        cifar.dev.data["images"], y_dev))
 
     '''
     datagen = ImageDataGenerator(
