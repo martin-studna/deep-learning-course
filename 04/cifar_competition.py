@@ -43,7 +43,7 @@ parser.add_argument("--batch_size", default=64*5, type=int, help="Batch size.")
 parser.add_argument("--learning_rate", default=0.001,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
-parser.add_argument("--l2", default=0.000, type=float,
+parser.add_argument("--l2", default=0.0001, type=float,
                     help="L2 regularization.")
 parser.add_argument("--epochs", default=400,
                     type=int, help="Number of epochs.")
