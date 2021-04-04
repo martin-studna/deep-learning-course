@@ -114,9 +114,13 @@ def main(args):
         loss=tf.losses.SparseCategoricalCrossentropy(),
         metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")]
     )
+    model.fit(cifar.train.data["images"], cifar.train.data["labels"], epochs=args.epochs, verbose=0, callbacks=[NeptuneCallback()], validation_data=(
+        cifar.dev.data["images"], cifar.dev.data["labels"]))
 
+    '''
     datagen = ImageDataGenerator(
         width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
+
 
     it_train = datagen.flow(
         cifar.train.data["images"], cifar.train.data["labels"], batch_size=args.batch_size)
@@ -124,6 +128,7 @@ def main(args):
 
     model.fit(it_train, steps_per_epoch=steps, epochs=args.epochs, verbose=0, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], cifar.dev.data["labels"]))
+    '''
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     # with open(os.path.join(args.logdir, "cifar_competition_test.txt"), "w", encoding="utf-8") as predictions_file:
