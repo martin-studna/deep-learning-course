@@ -8,6 +8,7 @@ import datetime
 import os
 from tensorflow.keras.callbacks import Callback
 from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Conv2D
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import MaxPooling2D
@@ -17,9 +18,15 @@ from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Flatten
 from tensorflow.keras.regularizers import l2
 from callback import NeptuneCallback
+from sam import SAM, sam_train_step
 import neptune
 from os import environ
 neptune.init(project_qualified_name='amdalifuk/cifar')
+
+
+class MyModel(Sequential):
+    def train_step(self, data):
+        return sam_train_step(self, data)
 
 
 environ["KERAS_BACKEND"] = "plaidml.keras.backend"
@@ -69,7 +76,7 @@ def main(args):
     # Load data
     cifar = CIFAR10()
     # TODO: Create the model and train it
-    model = tf.keras.Sequential()
+    model = MyModel()
     model.add(Conv2D(32, (3, 3), activation='relu',
               kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
     model.add(BatchNormalization())
@@ -114,6 +121,7 @@ def main(args):
     it_train = datagen.flow(
         cifar.train.data["images"], cifar.train.data["labels"], batch_size=args.batch_size)
     steps = int(cifar.train.data["images"].shape[0] / 64)
+
     model.fit(it_train, steps_per_epoch=steps, epochs=args.epochs, verbose=0, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], cifar.dev.data["labels"]))
 
