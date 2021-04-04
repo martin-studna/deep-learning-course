@@ -115,7 +115,7 @@ def main(args):
         loss=tf.losses.SparseCategoricalCrossentropy(),
         metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")]
     )
-    model.fit(cifar.train.data["images"], cifar.train.data["labels"], epochs=args.epochs, verbose=0, callbacks=[NeptuneCallback()], validation_data=(
+    model.fit(cifar.train.data["images"], cifar.train.data["labels"], epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], cifar.dev.data["labels"]))
 
     '''
