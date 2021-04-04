@@ -34,7 +34,7 @@ environ["KERAS_BACKEND"] = "plaidml.keras.backend"
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
 # Report only TF errors by default
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 
 # TODO: Define reasonable defaults and optionally more parameters
