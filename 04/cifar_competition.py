@@ -130,7 +130,7 @@ def main(args):
         cifar.train.data["images"], y, batch_size=args.batch_size)
     steps = int(cifar.train.data["images"].shape[0] / 64)
 
-    model.fit(it_train, steps_per_epoch=steps, epochs=args.epochs, verbose=0, callbacks=[NeptuneCallback()], validation_data=(
+    model.fit(it_train, steps_per_epoch=steps, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], y_dev))
     
     # Generate test set annotations, but in args.logdir to allow parallel execution.
