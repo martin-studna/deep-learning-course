@@ -15,6 +15,7 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Flatten
+from tensorflow.keras.regularizers import l2
 from callback import NeptuneCallback
 import neptune
 from os import environ
@@ -34,11 +35,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
 parser.add_argument("--learning_rate", default=0.001,
                     type=int, help="Batch size.")
-parser.add_argument("--momentum", default=0.9, type=int, help="Batch size.")
+parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
+parser.add_argument("--l2", default=0.001, type=float,
+                    help="L2 regularization.")
 parser.add_argument("--epochs", default=400,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=16, type=int,
+parser.add_argument("--threads", default=8, type=int,
                     help="Maximum number of threads to use.")
 
 
@@ -47,7 +50,6 @@ def main(args):
     np.random.seed(args.seed)
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
-    tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
     neptune.create_experiment(params={
         'batch_size': args.batch_size,
@@ -69,38 +71,39 @@ def main(args):
     # TODO: Create the model and train it
     model = tf.keras.Sequential()
     model.add(Conv2D(32, (3, 3), activation='relu',
-              kernel_initializer='he_uniform', padding='same', input_shape=(32, 32, 3)))
+              kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
     model.add(BatchNormalization())
-    model.add(Conv2D(32, (3, 3), activation='relu',
+    model.add(Conv2D(32, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.2))
-    model.add(Conv2D(64, (3, 3), activation='relu',
+    model.add(Conv2D(64, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
-    model.add(Conv2D(64, (3, 3), activation='relu',
+    model.add(Conv2D(64, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.3))
-    model.add(Conv2D(128, (3, 3), activation='relu',
+    model.add(Conv2D(128, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
-    model.add(Conv2D(128, (3, 3), activation='relu',
+    model.add(Conv2D(128, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.4))
     model.add(Flatten())
-    model.add(Dense(128, activation='relu',
+    model.add(Dense(128, activation='relu', kernel_regularizer=l2(args.l2),
                     kernel_initializer='he_uniform'))
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
     model.compile(
-        optimizer=tf.optimizers.Adam(learning_rate=args.learning_rate),
+        optimizer=tf.optimizers.SGD(
+            learning_rate=args.learning_rate, momentum=args.momentum),
         loss=tf.losses.SparseCategoricalCrossentropy(),
         metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")]
     )
