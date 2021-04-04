@@ -128,7 +128,7 @@ def main(args):
 
     it_train = datagen.flow(
         cifar.train.data["images"], y, batch_size=args.batch_size)
-    steps = int(cifar.train.data["images"].shape[0] / 64)
+    steps = int(cifar.train.data["images"].shape[0] / args.batch_size)
 
     model.fit(it_train, steps_per_epoch=steps, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], y_dev))
