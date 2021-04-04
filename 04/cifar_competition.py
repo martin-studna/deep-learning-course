@@ -39,7 +39,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
+parser.add_argument("--batch_size", default=64*5, type=int, help="Batch size.")
 parser.add_argument("--learning_rate", default=0.001,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
