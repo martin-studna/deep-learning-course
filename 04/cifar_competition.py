@@ -76,28 +76,29 @@ def main(args):
     # Load data
     cifar = CIFAR10()
     # TODO: Create the model and train it
+    v = 0.5
     model = MyModel()
     model = Sequential()
-    model.add(Conv2D(32, (3, 3), activation='relu',
+    model.add(Conv2D(32//v, (3, 3), activation='relu',
               kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
     model.add(BatchNormalization())
-    model.add(Conv2D(32, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
+    model.add(Conv2D(32//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.2))
-    model.add(Conv2D(64, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
+    model.add(Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
-    model.add(Conv2D(64, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
+    model.add(Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.3))
-    model.add(Conv2D(128, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
+    model.add(Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
-    model.add(Conv2D(128, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
+    model.add(Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
