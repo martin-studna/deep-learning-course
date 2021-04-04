@@ -76,7 +76,7 @@ def main(args):
     # Load data
     cifar = CIFAR10()
     # TODO: Create the model and train it
-    v = 1
+    v = 0.5
     model = MyModel()
     model = Sequential()
     model.add(Conv2D(32//v, (3, 3), activation='relu',
