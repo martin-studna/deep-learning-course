@@ -110,7 +110,7 @@ def main(args):
     model.add(Dense(10, activation='softmax'))
 
     model.compile(
-        optimizer=tf.optimizers.SGD(
+        optimizer=tf.optimizers.Adam(
             learning_rate=args.learning_rate, momentum=args.momentum),
         loss=tf.losses.SparseCategoricalCrossentropy(),
         metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")]
