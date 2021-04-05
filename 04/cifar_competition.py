@@ -156,10 +156,13 @@ def main(args):
     def train_augment(image, label):
         if generator.uniform([]) >= 0.5:
             image = tf.image.flip_left_right(image)
+
         image = tf.image.resize_with_crop_or_pad(
             image, CIFAR10.H + 6, CIFAR10.W + 6)
+
         image = tf.image.resize(image, [generator.uniform([], minval=CIFAR10.H, maxval=CIFAR10.H + 12, dtype=tf.int32),
                                         generator.uniform([], minval=CIFAR10.W, maxval=CIFAR10.W + 12, dtype=tf.int32)])
+
         image = tf.image.crop_to_bounding_box(
             image, target_height=CIFAR10.H, target_width=CIFAR10.W,
             offset_height=generator.uniform([], maxval=tf.shape(
@@ -169,9 +172,9 @@ def main(args):
         )
         return image, label
 
-    train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(train_augment).batch(args.batch_size).prefetch(len(cifar.train.data["images"]))
+    train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(train_augment).batch(len(cifar.train.data["images"])).prefetch(len(cifar.train.data["images"]))
         
-    model.fit(train, verbose=1, callbacks=callback, validation_data=(
+    model.fit(train, verbose=1, callbacks=callback, batch_size=args.batch_size, validation_data=(
         cifar.dev.data["images"], y_dev), epochs=args.epochs, workers=100, use_multiprocessing=True, max_queue_size=len(cifar.train.data["images"]))
     
 
