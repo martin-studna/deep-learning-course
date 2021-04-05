@@ -177,7 +177,7 @@ def main(args):
 ).cache().shuffle(len(cifar.train.data["images"]), seed=args.seed).map(
     lambda image, label: (tf.image.random_flip_left_right(image), label)
 ).map(
-    lambda image, label: (tf.image.random_crop(image, size=[CIFAR10.H, target_width=CIFAR10.W,3]) , label) , num_parallel_calls=10
+    lambda image, label: (tf.image.random_crop(image, size=[CIFAR10.H, CIFAR10.W,3]) , label) , num_parallel_calls=10
 ).prefetch(len(cifar.train.data["images"])//2).batch(args.batch_size)
         
     model.fit(train, verbose=1, callbacks=callback,  validation_data=(
