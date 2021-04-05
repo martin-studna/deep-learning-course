@@ -76,9 +76,9 @@ def main(args):
     # Load data
     cifar = CIFAR10()
     # TODO: Create the model and train it
-    v = 0.5
-    model = MyModel()
-    #model = Sequential()
+    v = 0.3
+    #model = MyModel()
+    model = Sequential()
     model.add(Conv2D(32//v, (3, 3), activation='relu',
               kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
     model.add(BatchNormalization())
@@ -107,8 +107,19 @@ def main(args):
     model.add(Dense(128, activation='relu', kernel_regularizer=l2(args.l2),
                     kernel_initializer='he_uniform'))
     model.add(BatchNormalization())
-    #model.add(Dropout(0.5))
+    model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
+
+    model = tf.keras.applications.ResNet50V2(
+    include_top=True,
+    weights=None,
+    input_tensor=None,
+    input_shape=cifar.train.data["images"][0].shape,
+    pooling=None,
+    classes=1000,
+    classifier_activation="softmax",
+)
+
 
     model.compile(
         optimizer=tf.optimizers.Adam(
