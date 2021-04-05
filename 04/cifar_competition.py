@@ -172,7 +172,9 @@ def main(args):
         )
         return image, label
 
-    train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(train_augment, num_parallel_calls=10000, deterministic=False).prefetch(len(cifar.train.data["images"])//2).batch(args.batch_size)
+    train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(
+    lambda image, label: (tf.image.random_flip_left_right(image), label)
+).prefetch(len(cifar.train.data["images"])//2).batch(args.batch_size)
         
     model.fit(train, verbose=1, callbacks=callback,  validation_data=(
         cifar.dev.data["images"], y_dev), epochs=args.epochs, workers=10, use_multiprocessing=True, max_queue_size=len(cifar.train.data["images"]))
