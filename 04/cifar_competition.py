@@ -16,6 +16,7 @@ from tensorflow.keras.layers import Dense
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Input
 from tensorflow.keras.regularizers import l2
 from callback import NeptuneCallback
 from sam import SAM, sam_train_step
@@ -80,33 +81,33 @@ def main(args):
     # Load data
     cifar = CIFAR10()
     # TODO: Create the model and train it
-    v = 0.1
+    v = 1
     #model = MyModel()
-    model = Sequential()
-    model.add(Conv2D(32//v, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
-    model.add(BatchNormalization())
-    model.add(Conv2D(32//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Dropout(0.2))
-    model.add(Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
-    model.add(BatchNormalization())
-    model.add(Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Dropout(0.3))
-    model.add(Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
-    model.add(BatchNormalization())
-    model.add(Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
-    model.add(BatchNormalization())
-    model.add(MaxPooling2D((2, 2)))
-    model.add(Dropout(0.4))
-    model.add(Flatten())
-    model.add(Dense(128, activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform'))
-    model.add(BatchNormalization())
-    #model.add(Dropout(0.5))
-    model.add(Dense(10, activation='softmax'))
-
+    input = Input(shape=(32, 32, 3))
+    x = Conv2D(32//v, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2))(input)
+    x = BatchNormalization()(x)
+    x = Conv2D(32//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+    x = BatchNormalization()(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.2)(x)
+    x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+    x = BatchNormalization()(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.3)(x)
+    x = Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+    x = BatchNormalization()(x)
+    x = Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+    x = BatchNormalization()(x)
+    x = MaxPooling2D((2, 2))(x)
+    x = Dropout(0.4)(x)
+    x = Flatten()(x)
+    x = Dense(128, activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform')(x)
+    x = BatchNormalization()(x)
+    #x = Dropout(0.5))
+    x = Dense(10, activation='softmax')(x)
+    model = Model(inputs=[input], outputs=[x])
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0),
