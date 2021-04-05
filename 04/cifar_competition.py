@@ -116,7 +116,7 @@ def main(args):
         x = Flatten()(x)
         x = Dense(128, activation='selu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform')(x)
         x = BatchNormalization()(x)
-        x = Dropout(0.5))
+        x = Dropout(0.5)(x)
         x = Dense(10, activation='softmax')(x)
 
         #model = MyModel(inputs=[input], outputs=[x])
