@@ -142,10 +142,10 @@ def main(args):
         cifar.dev.data["images"], y_dev))
     '''
     if use_neptune:        
-        callback = NeptuneCallback()
+        callback = [NeptuneCallback()]
     else:
         callback = None
-    model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=[callback], validation_data=(
+    model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
         cifar.dev.data["images"], y_dev))
 
 
