@@ -40,7 +40,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=32*1, type=int, help="Batch size.")
-parser.add_argument("--learning_rate", default=0.001,
+parser.add_argument("--learning_rate", default=0.01,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
 parser.add_argument("--l2", default=0.000, type=float,
@@ -63,7 +63,7 @@ def main(args):
         'learning_rate': args.learning_rate,
         'epochs': args.epochs,
         'threads': args.threads
-    })
+    },abort_callback=lambda: run_shutdown_logic_and_exit())
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -110,12 +110,16 @@ def main(args):
     model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
-
+    model = tf.keras.applications.EfficientNetB3(
+        weights=None, 
+        input_shape=cifar.train.data["labels"][0].shape,
+        classes=10
+        )
 
     model.compile(
         optimizer=tf.optimizers.Adam(
             learning_rate=args.learning_rate),
-        loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
+        loss=tf.losses.CategoricalCrossentropy(label_smoothing=0),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
     y = tf.keras.utils.to_categorical(cifar.train.data["labels"])
@@ -123,18 +127,22 @@ def main(args):
     #model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
     #    cifar.dev.data["images"], y_dev))
 
-    
+    '''
     datagen = ImageDataGenerator(
         width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
 
 
     it_train = datagen.flow(
         cifar.train.data["images"], y, batch_size=args.batch_size)
-    steps = int(cifar.train.data["images"].shape[0] / args.batch_size)
 
     model.fit(it_train, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], y_dev))
-    
+    '''
+
+    model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
+        cifar.dev.data["images"], y_dev))
+
+
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     # with open(os.path.join(args.logdir, "cifar_competition_test.txt"), "w", encoding="utf-8") as predictions_file:
     #     for probs in model.predict(cifar.test.data["images"], batch_size=args.batch_size):
