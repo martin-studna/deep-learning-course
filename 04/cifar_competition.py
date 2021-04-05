@@ -112,7 +112,7 @@ def main(args):
 
     model = tf.keras.applications.EfficientNetB3(
         weights=None, 
-        input_shape=cifar.train.data["labels"][0].shape,
+        input_shape=cifar.train.data["images"][0].shape,
         classes=10
         )
 
