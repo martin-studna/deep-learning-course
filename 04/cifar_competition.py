@@ -114,7 +114,7 @@ def main(args):
     model = Model(inputs=[input], outputs=[x])
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
-        loss=tf.losses.CategoricalCrossentropy(label_smoothing=0),
+        loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
     y = tf.keras.utils.to_categorical(cifar.train.data["labels"])
