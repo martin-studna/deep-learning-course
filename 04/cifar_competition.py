@@ -151,7 +151,7 @@ def main(args):
 
     generator = tf.random.Generator.from_seed(args.seed)
 
-    w,h,c = cifar.train.data["images"][0]
+    w,h,c = cifar.train.data["images"][0].shape
 
     def train_augment(image, label):
         if generator.uniform([]) >= 0.5:
