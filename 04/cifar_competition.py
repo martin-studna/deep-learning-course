@@ -54,7 +54,7 @@ parser.add_argument("--l2", default=0.000, type=float,
                     help="L2 regularization.")
 parser.add_argument("--epochs", default=100,
                     type=int, help="Number of epochs.")
-parser.add_argument("--seed", default=43, type=int, help="Random seed.")
+parser.add_argument("--seed", default=44, type=int, help="Random seed.")
 parser.add_argument("--threads", default=32, type=int,
                     help="Maximum number of threads to use.")
 
@@ -113,7 +113,7 @@ def main(args):
     x = Dense(10, activation='softmax')(x)
 
     #model = MyModel(inputs=[input], outputs=[x])
-    model = Model(inputs=[input], outputs=[x])
+    model = MyModel(inputs=[input], outputs=[x])
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
