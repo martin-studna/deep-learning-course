@@ -152,7 +152,7 @@ def main(args):
     generator = tf.random.Generator.from_seed(args.seed)
 
     w,h,c = cifar.train.data["images"][0].shape
-
+    
     def train_augment(image, label):
         if generator.uniform([]) >= 0.5:
             image = tf.image.flip_left_right(image)
@@ -172,7 +172,7 @@ def main(args):
     train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(train_augment).batch(args.batch_size).prefetch(len(cifar.train.data["images"]))
         
     model.fit(train, verbose=1, callbacks=callback, validation_data=(
-        cifar.dev.data["images"], y_dev), epochs=args.epochs, workers=100, use_multiprocessing=True, max_queue_size=100)
+        cifar.dev.data["images"], y_dev), epochs=args.epochs, workers=100, use_multiprocessing=True, max_queue_size=len(cifar.train.data["images"]))
     
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
