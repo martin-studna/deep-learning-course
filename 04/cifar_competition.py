@@ -169,6 +169,12 @@ def main(args):
             lambda image, label: (tf.image.random_flip_left_right(image), label)
         ).map(
             lambda image, label: (tf.image.random_crop(image, size=[CIFAR10.H, CIFAR10.W,3]) , label) , num_parallel_calls=10
+        ).map(
+            lambda image, label: (tf.image.random_saturation(image, 0.6, 1.6) , label) , num_parallel_calls=10
+        ).map(
+            lambda image, label: (tf.image.random_brightness(image, 0.05) , label) , num_parallel_calls=10
+        ).map(
+            lambda image, label: (tf.image.random_contrast(image, 0.7, 1.3) , label) , num_parallel_calls=10
         ).prefetch(len(cifar.train.data["images"])//2).batch(args.batch_size)
             
         model.fit(train, verbose=1, callbacks=callback,  validation_data=(
