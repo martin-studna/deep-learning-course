@@ -158,7 +158,7 @@ def main(args):
     w,h,c = cifar.train.data["images"][0].shape
     
     train = train.map(
-    lambda image, label: (tf.image.resize(image, [CIFAR10.H + 6, CIFAR10.W + 6], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR), label), num_parallel_calls=10
+    lambda image, label: (tf.image.resize_with_crop_or_pad(image, CIFAR10.H + 6, CIFAR10.W + 6), label), num_parallel_calls=10
 ).cache().shuffle(len(cifar.train.data["images"]), seed=args.seed).map(
     lambda image, label: (tf.image.random_flip_left_right(image), label)
 ).map(
