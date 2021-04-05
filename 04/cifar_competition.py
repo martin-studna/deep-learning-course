@@ -169,7 +169,7 @@ def main(args):
         )
         return image, label
 
-    train = train.take(5000).shuffle(5000, seed=args.seed).map(
+    train = train.take(args.batch_size).shuffle(args.batch_size, seed=args.seed).map(
     train_augment).batch(args.batch_size).prefetch(tf.data.AUTOTUNE)
         
     model.fit(train, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
