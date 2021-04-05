@@ -148,15 +148,15 @@ def main(args):
     '''
     datagen = ImageDataGenerator(
         width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
-    datagen.fit(cifar.train.data["images"])
+    datagen.fit(cifar.train.data["images"], )
 
     it_train = datagen.flow(
         cifar.train.data["images"], y, batch_size=args.batch_size)
 
     steps = int(np.ceil(cifar.train.data["images"].shape[0]/args.batch_size))
 
-    model.fit(it_train, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
-        cifar.dev.data["images"], y_dev), steps_per_epoch = steps)
+    model.fit_generator(it_train, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
+        cifar.dev.data["images"], y_dev), steps_per_epoch = steps, max_queue_size=100, workers = 10 , use_multiprocessing=True,)
     
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
