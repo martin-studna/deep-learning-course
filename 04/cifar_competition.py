@@ -172,9 +172,9 @@ def main(args):
         )
         return image, label
 
-    train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(train_augment).batch(2048).prefetch(len(cifar.train.data["images"]))
+    train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(train_augment).batch(args.batch_size).prefetch(len(cifar.train.data["images"]))
         
-    model.fit(train, verbose=1, callbacks=callback, batch_size=args.batch_size, validation_data=(
+    model.fit_generator(train, verbose=1, callbacks=callback, batch_size=args.batch_size, validation_data=(
         cifar.dev.data["images"], y_dev), epochs=args.epochs, workers=100, use_multiprocessing=True, max_queue_size=len(cifar.train.data["images"]))
     
 
