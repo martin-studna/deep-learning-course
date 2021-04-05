@@ -91,12 +91,10 @@ def main(args):
     x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
     x = BatchNormalization()(x)
     x = MaxPooling2D((2, 2))(x)
-    r1 = x
     x = Dropout(0.2)(x)
     x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
     x = BatchNormalization()(x)
     x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
-    x = tf.keras.layers.Add()([x,r1])
     x = BatchNormalization()(x)
     x = MaxPooling2D((2, 2))(x)
     x = Dropout(0.3)(x)
