@@ -218,9 +218,14 @@ def main(args):
         a0.update_state(p0, y_dev)
         print(   a0.result().numpy()    )
 
+        r1 = m1.predict(cifar.test.data["images"],batch_size=args.batch_size)
+        r2 = m2.predict(cifar.test.data["images"],batch_size=args.batch_size)
+        r3 = m3.predict(cifar.test.data["images"],batch_size=args.batch_size)
+        r0 = r1+r2+r3
+
 
         with open("cifar_competition_test.txt", "w", encoding="utf-8") as predictions_file:
-            for probs in p0:
+            for probs in r0:
                 print(np.argmax(probs), file=predictions_file)
                 
         pass
