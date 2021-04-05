@@ -177,8 +177,6 @@ def main(args):
 ).cache().shuffle(len(cifar.train.data["images"]), seed=args.seed).map(
     lambda image, label: (tf.image.random_flip_left_right(image), label)
 ).map(
-    lambda image, label: (tf.image.resize_with_crop_or_pad(image, CIFAR10.H + 6, CIFAR10.W + 6), label), num_parallel_calls=10
-).map(
     lambda image, label: (tf.image.crop_to_bounding_box(
             image, target_height=CIFAR10.H, target_width=CIFAR10.W,
             offset_height=generator.uniform([], maxval=tf.shape(
