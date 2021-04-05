@@ -147,7 +147,7 @@ def main(args):
 
     '''
     train = tf.data.Dataset.from_tensor_slices(
-        (cifar.train.data["images"], cifar.train.data["labels"]))
+        (cifar.train.data["images"], y))
 
     generator = tf.random.Generator.from_seed(args.seed)
 
