@@ -156,9 +156,20 @@ def main(args):
     def train_augment(image, label):
         if generator.uniform([]) >= 0.5:
             image = tf.image.flip_left_right(image)
+        image = tf.image.resize_with_crop_or_pad(
+            image, CIFAR10.H + 6, CIFAR10.W + 6)
+        image = tf.image.resize(image, [generator.uniform([], minval=CIFAR10.H, maxval=CIFAR10.H + 12, dtype=tf.int32),
+                                        generator.uniform([], minval=CIFAR10.W, maxval=CIFAR10.W + 12, dtype=tf.int32)])
+        image = tf.image.crop_to_bounding_box(
+            image, target_height=CIFAR10.H, target_width=CIFAR10.W,
+            offset_height=generator.uniform([], maxval=tf.shape(
+                image)[0] - CIFAR10.H + 1, dtype=tf.int32),
+            offset_width=generator.uniform([], maxval=tf.shape(
+                image)[1] - CIFAR10.W + 1, dtype=tf.int32),
+        )
         return image, label
 
-    train = train.take(len(cifar.train.data["images"]) ).batch(args.batch_size)
+    train = train.take(len(cifar.train.data["images"]) ).shuffle(5000, seed=args.seed).map(train_augment).batch(args.batch_size)
         
     model.fit(train, verbose=1, callbacks=callback, validation_data=(
         cifar.dev.data["images"], y_dev), epochs=args.epochs)
