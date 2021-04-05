@@ -110,7 +110,7 @@ def main(args):
     model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
-    model = tf.keras.applications.ResNet50V2(
+    model = tf.keras.applications.EfficientNetB3(
     include_top=True,
     weights=None,
     input_tensor=None,
@@ -134,7 +134,7 @@ def main(args):
 
     
     datagen = ImageDataGenerator(
-        width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True, rotation_range=10)
+        width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
 
 
     it_train = datagen.flow(
