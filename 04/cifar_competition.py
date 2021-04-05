@@ -146,16 +146,30 @@ def main(args):
         cifar.dev.data["images"], y_dev), batch_size=args.batch_size)
 
     '''
-    datagen = ImageDataGenerator(
-        width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
-    datagen.fit(cifar.train.data["images"], )
+    train = tf.data.Dataset.from_tensor_slices(
+        (cifar.train.data["images"], cifar.train.data["labels"]))
 
-    it_train = datagen.flow(
-        cifar.train.data["images"], y, batch_size=args.batch_size)
+    generator = tf.random.Generator.from_seed(args.seed)
+    def train_augment(image, label):
+        if generator.uniform([]) >= 0.5:
+            image = tf.image.flip_left_right(image)
+        image = tf.image.resize_with_crop_or_pad(
+            image, CIFAR10.H + 6, CIFAR10.W + 6)
+        image = tf.image.resize(image, [generator.uniform([], minval=CIFAR10.H, maxval=CIFAR10.H + 12, dtype=tf.int32),
+                                        generator.uniform([], minval=CIFAR10.W, maxval=CIFAR10.W + 12, dtype=tf.int32)])
+        image = tf.image.crop_to_bounding_box(
+            image, target_height=CIFAR10.H, target_width=CIFAR10.W,
+            offset_height=generator.uniform([], maxval=tf.shape(
+                image)[0] - CIFAR10.H + 1, dtype=tf.int32),
+            offset_width=generator.uniform([], maxval=tf.shape(
+                image)[1] - CIFAR10.W + 1, dtype=tf.int32),
+        )
+        return image, label
 
-    steps = int(np.ceil(cifar.train.data["images"].shape[0]/args.batch_size))
-
-    model.fit_generator(it_train, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
+    train = train.take(5000).shuffle(5000, seed=args.seed).map(
+    train_augment).batch(args.batch_size).prefetch(tf.data.AUTOTUNE)
+        
+    model.fit(train, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
         cifar.dev.data["images"], y_dev), steps_per_epoch = steps, max_queue_size=100, workers = 10 , use_multiprocessing=True,)
     
 
