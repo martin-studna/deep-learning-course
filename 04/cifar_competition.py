@@ -19,9 +19,13 @@ from tensorflow.keras.layers import Flatten
 from tensorflow.keras.regularizers import l2
 from callback import NeptuneCallback
 from sam import SAM, sam_train_step
-import neptune
+
+use_neptune = False
+if use_neptune:
+    import neptune
+    neptune.init(project_qualified_name='amdalifuk/cifar')
+
 from os import environ
-neptune.init(project_qualified_name='amdalifuk/cifar')
 
 
 class MyModel(Sequential):
@@ -57,13 +61,13 @@ def main(args):
     np.random.seed(args.seed)
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
-
-    neptune.create_experiment(params={
-        'batch_size': args.batch_size,
-        'learning_rate': args.learning_rate,
-        'epochs': args.epochs,
-        'threads': args.threads
-    },abort_callback=lambda: run_shutdown_logic_and_exit())
+    if use_neptune:        
+        neptune.create_experiment(params={
+            'batch_size': args.batch_size,
+            'learning_rate': args.learning_rate,
+            'epochs': args.epochs,
+            'threads': args.threads
+        },abort_callback=lambda: run_shutdown_logic_and_exit())
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -137,8 +141,11 @@ def main(args):
     model.fit(it_train, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], y_dev))
     '''
-
-    model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
+    if use_neptune:        
+        callback = NeptuneCallback()
+    else:
+        callback = None
+    model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=[callback], validation_data=(
         cifar.dev.data["images"], y_dev))
 
 
