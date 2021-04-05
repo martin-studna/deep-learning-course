@@ -43,8 +43,8 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=1024, type=int, help="Batch size.")
-parser.add_argument("--learning_rate", default=0.00001,
+parser.add_argument("--batch_size", default=2048, type=int, help="Batch size.")
+parser.add_argument("--learning_rate", default=0.1,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
 parser.add_argument("--l2", default=0.000, type=float,
@@ -119,9 +119,8 @@ def main(args):
         input_shape=cifar.train.data["images"][0].shape,
         classes=10
         )
-
     model.compile(
-        optimizer=tf.keras.optimizers.RMSprop(learning_rate=0.2),
+        optimizer=tf.keras.optimizers.RMSprop(learning_rate=args.learning_rate),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
