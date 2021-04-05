@@ -31,7 +31,7 @@ if use_neptune:
 from os import environ
 
 
-class MyModel(Sequential):
+class MyModel(Model):
     def train_step(self, data):
         return sam_train_step(self, data)
 
@@ -109,7 +109,8 @@ def main(args):
     x = BatchNormalization()(x)
     #x = Dropout(0.5))
     x = Dense(10, activation='softmax')(x)
-    model = Model(inputs=[input], outputs=[x])
+
+    model = MyModel(inputs=[input], outputs=[x])
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
@@ -190,7 +191,7 @@ def main(args):
     #         print(np.argmax(probs), file=predictions_file)
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
-    model.save('modeel')
+    model.save('modeelsam.h5')
     with open("cifar_competition_test.txt", "w", encoding="utf-8") as predictions_file:
         for probs in model.predict(cifar.test.data["images"], batch_size=args.batch_size):
             print(np.argmax(probs), file=predictions_file)
