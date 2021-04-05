@@ -43,16 +43,16 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=2048, type=int, help="Batch size.")
-parser.add_argument("--learning_rate", default=0.1,
+parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
+parser.add_argument("--learning_rate", default=0.01,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
 parser.add_argument("--l2", default=0.000, type=float,
                     help="L2 regularization.")
-parser.add_argument("--epochs", default=400,
+parser.add_argument("--epochs", default=200,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=8, type=int,
+parser.add_argument("--threads", default=32, type=int,
                     help="Maximum number of threads to use.")
 
 
@@ -83,45 +83,33 @@ def main(args):
     v = 0.5
     #model = MyModel()
     model = Sequential()
-    model.add(Conv2D(32//v, (3, 3), activation='relu',
-              kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
+    model.add(Conv2D(32//v, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
     model.add(BatchNormalization())
-    model.add(Conv2D(32//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
-                     kernel_initializer='he_uniform', padding='same'))
+    model.add(Conv2D(32//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.2))
-    model.add(Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
-                     kernel_initializer='he_uniform', padding='same'))
+    model.add(Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
-    model.add(Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
-                     kernel_initializer='he_uniform', padding='same'))
+    model.add(Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.3))
-    model.add(Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
-                     kernel_initializer='he_uniform', padding='same'))
+    model.add(Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
-    model.add(Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
-                     kernel_initializer='he_uniform', padding='same'))
+    model.add(Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same'))
     model.add(BatchNormalization())
     model.add(MaxPooling2D((2, 2)))
     model.add(Dropout(0.4))
     model.add(Flatten())
-    model.add(Dense(128, activation='relu', kernel_regularizer=l2(args.l2),
-                    kernel_initializer='he_uniform'))
+    model.add(Dense(128, activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform'))
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
-    model = tf.keras.applications.EfficientNetB3(
-        weights=None, 
-        input_shape=cifar.train.data["images"][0].shape,
-        classes=10
-        )
     model.compile(
-        optimizer=tf.keras.optimizers.RMSprop(learning_rate=args.learning_rate),
-        loss=tf.losses.CategoricalCrossentropy(label_smoothing=0),
+        optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
+        loss=tf.losses.CategoricalCrossentropy(label_smoothing=None),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
     y = tf.keras.utils.to_categorical(cifar.train.data["labels"])
