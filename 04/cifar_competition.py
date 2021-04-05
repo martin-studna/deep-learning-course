@@ -177,13 +177,7 @@ def main(args):
 ).cache().shuffle(len(cifar.train.data["images"]), seed=args.seed).map(
     lambda image, label: (tf.image.random_flip_left_right(image), label)
 ).map(
-    lambda image, label: (tf.image.crop_to_bounding_box(
-            image, target_height=CIFAR10.H, target_width=CIFAR10.W,
-            offset_height=generator.uniform([], maxval=tf.shape(
-                image)[0] - CIFAR10.H + 1, dtype=tf.int32),
-            offset_width=generator.uniform([], maxval=tf.shape(
-                image)[1] - CIFAR10.W + 1, dtype=tf.int32),
-        ), label) , num_parallel_calls=10
+    lambda image, label: (tf.image.random_crop(image, size=[CIFAR10.H, target_width=CIFAR10.W,3]) , label) , num_parallel_calls=10
 ).prefetch(len(cifar.train.data["images"])//2).batch(args.batch_size)
         
     model.fit(train, verbose=1, callbacks=callback,  validation_data=(
