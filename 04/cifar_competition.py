@@ -114,7 +114,7 @@ def main(args):
 
     model.compile(
         optimizer=tf.optimizers.Adam(
-            learning_rate=args.learning_rate, momentum=args.momentum),
+            learning_rate=args.learning_rate),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
