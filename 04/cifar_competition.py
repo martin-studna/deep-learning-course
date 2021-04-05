@@ -104,7 +104,7 @@ def main(args):
     model.add(Flatten())
     model.add(Dense(128, activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform'))
     model.add(BatchNormalization())
-    model.add(Dropout(0.5))
+    #model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
     model.compile(
