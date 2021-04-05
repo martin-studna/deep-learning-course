@@ -20,7 +20,7 @@ from tensorflow.keras.regularizers import l2
 from callback import NeptuneCallback
 from sam import SAM, sam_train_step
 
-use_neptune = True
+use_neptune = False
 if use_neptune:
     import neptune
     neptune.init(project_qualified_name='amdalifuk/cifar')
