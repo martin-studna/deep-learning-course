@@ -76,7 +76,7 @@ def main(args):
     # Load data
     cifar = CIFAR10()
     # TODO: Create the model and train it
-    v = 0.3
+    v = 0.5
     #model = MyModel()
     model = Sequential()
     model.add(Conv2D(32//v, (3, 3), activation='relu',
@@ -110,20 +110,11 @@ def main(args):
     model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
-    model = tf.keras.applications.EfficientNetB0(
-    include_top=True,
-    weights=None,
-    input_tensor=None,
-    input_shape=cifar.train.data["images"][0].shape,
-    pooling=None,
-    classes=10,
-    classifier_activation="softmax",
-)
 
 
     model.compile(
-        optimizer=tf.optimizers.Adam(
-            learning_rate=args.learning_rate),
+        optimizer=tf.optimizers.SGD(
+            learning_rate=args.learning_rate, momentum=args.momentum),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
@@ -141,7 +132,7 @@ def main(args):
         cifar.train.data["images"], y, batch_size=args.batch_size)
     steps = int(cifar.train.data["images"].shape[0] / args.batch_size)
 
-    model.fit(it_train, steps_per_epoch=steps, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
+    model.fit(it_train, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], y_dev))
     
     # Generate test set annotations, but in args.logdir to allow parallel execution.
