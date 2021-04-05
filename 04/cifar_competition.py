@@ -83,7 +83,7 @@ def main(args):
     # Load data
     cifar = CIFAR10()
     # TODO: Create the model and train it
-    v = 1
+    v = 0.5
     #model = MyModel()
     input = Input(shape=(32, 32, 3))
     x = Conv2D(32//v, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2))(input)
