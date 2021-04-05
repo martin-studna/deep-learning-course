@@ -172,7 +172,7 @@ def main(args):
     train = train.take(args.batch_size).shuffle(args.batch_size, seed=args.seed).map(
     train_augment).batch(args.batch_size).prefetch(tf.data.AUTOTUNE)
         
-    model.fit(train, verbose=1, callbacks=callback, validation_data=(
+    model.fit_generator(train, verbose=1, callbacks=callback, validation_data=(
         cifar.dev.data["images"], y_dev))
     
 
