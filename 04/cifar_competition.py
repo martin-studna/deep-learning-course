@@ -158,7 +158,7 @@ def main(args):
             image = tf.image.flip_left_right(image)
         return image, label
 
-    train = train.take(args.batch_size).batch(args.batch_size)
+    train = train.take(len(cifar.train.data["images"]) ).batch(args.batch_size)
         
     model.fit(train, verbose=1, callbacks=callback, validation_data=(
         cifar.dev.data["images"], y_dev), epochs=args.epochs)
