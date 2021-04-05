@@ -161,7 +161,7 @@ def main(args):
     train = train.take(args.batch_size).batch(args.batch_size)
         
     model.fit(train, verbose=1, callbacks=callback, validation_data=(
-        cifar.dev.data["images"], y_dev))
+        cifar.dev.data["images"], y_dev), epochs=args.epochs)
     
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
