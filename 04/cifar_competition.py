@@ -119,7 +119,7 @@ def main(args):
 
     
 
-    from keras.callbacks import ReduceLROnPlateau
+    from tf.keras.callbacks import ReduceLROnPlateau
 
     y = tf.keras.utils.to_categorical(cifar.train.data["labels"])
     y_dev = tf.keras.utils.to_categorical(cifar.dev.data["labels"])
