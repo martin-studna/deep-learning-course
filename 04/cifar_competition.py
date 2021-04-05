@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re
+from tensorflow import keras
 
 from tensorflow.python.ops.gen_math_ops import Add
 from cifar10 import CIFAR10
@@ -93,34 +94,37 @@ def main(args):
         v = 0.5
         #model = MyModel()
         input = Input(shape=(32, 32, 3))
-        x = Conv2D(32//v, (3, 3), activation='selu', kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2))(input)
+        x = Conv2D(32//v, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2))(input)
         x = BatchNormalization()(x)
-        x = Conv2D(64//v, (3, 3), activation='selu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+        x = Conv2D(32//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
         x = BatchNormalization()(x)
         x = MaxPooling2D((2, 2))(x)
+        r1 = x
         x = Dropout(0.2)(x)
-        x = Conv2D(64//v, (3, 3), activation='selu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+        x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
         x = BatchNormalization()(x)
-        x = Conv2D(64//v, (3, 3), activation='selu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
-        x = BatchNormalization()(x)
+        x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+        x = keras.layers.Concatenate()([x,r1])
+        x = BatchNormalization()(x)        
         x = MaxPooling2D((2, 2))(x)
         x = Dropout(0.3)(x)
-        x = Conv2D(128//v, (3, 3), activation='selu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+        r2 = x
+        x = Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
         x = BatchNormalization()(x)
-        x = Conv2D(128//v, (3, 3), activation='selu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+        x = Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
         x = BatchNormalization()(x)
-        x = Conv2D(128//v, (3, 3), activation='selu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
-        x = BatchNormalization()(x)
+        x = keras.layers.Concatenate()([x,r2])
+
         x = MaxPooling2D((2, 2))(x)
         x = Dropout(0.4)(x)
         x = Flatten()(x)
-        x = Dense(128, activation='selu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform')(x)
+        x = Dense(128, activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform')(x)
         x = BatchNormalization()(x)
         x = Dropout(0.5)(x)
         x = Dense(10, activation='softmax')(x)
 
         #model = MyModel(inputs=[input], outputs=[x])
-        model = MyModel(inputs=[input], outputs=[x])
+        model = Model(inputs=[input], outputs=[x])
         model.compile(
             optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
             loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
@@ -138,7 +142,7 @@ def main(args):
         
         patient = 4
         reduce = ReduceLROnPlateau(
-            monitor = 'val_loss', 
+            monitor = 'loss', 
             factor = 0.5, 
             patience = patient, 
             min_lr=0.00001,
