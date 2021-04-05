@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import re
+
+from tensorflow.python.ops.gen_math_ops import Add
 from cifar10 import CIFAR10
 import tensorflow as tf
 import numpy as np
@@ -86,13 +88,15 @@ def main(args):
     input = Input(shape=(32, 32, 3))
     x = Conv2D(32//v, (3, 3), activation='relu', kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2))(input)
     x = BatchNormalization()(x)
-    x = Conv2D(32//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+    x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
     x = BatchNormalization()(x)
     x = MaxPooling2D((2, 2))(x)
+    r1 = x
     x = Dropout(0.2)(x)
     x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
     x = BatchNormalization()(x)
     x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+    x = tf.keras.layers.Add()([x,r1])
     x = BatchNormalization()(x)
     x = MaxPooling2D((2, 2))(x)
     x = Dropout(0.3)(x)
