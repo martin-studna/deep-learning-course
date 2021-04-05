@@ -196,6 +196,7 @@ def main(args):
     #         print(np.argmax(probs), file=predictions_file)
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
+    model.save('modeel')
     with open("cifar_competition_test.txt", "w", encoding="utf-8") as predictions_file:
         for probs in model.predict(cifar.test.data["images"], batch_size=args.batch_size):
             print(np.argmax(probs), file=predictions_file)
