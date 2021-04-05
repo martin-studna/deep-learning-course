@@ -115,6 +115,12 @@ def main(args):
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
+
+
+    
+
+    from keras.callbacks import ReduceLROnPlateau
+
     y = tf.keras.utils.to_categorical(cifar.train.data["labels"])
     y_dev = tf.keras.utils.to_categorical(cifar.dev.data["labels"])
     #model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
@@ -131,10 +137,19 @@ def main(args):
     model.fit(it_train, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
         cifar.dev.data["images"], y_dev), batch_size=args.batch_size)
     '''
+    patient = 4
+    reduce = ReduceLROnPlateau(
+        monitor = 'val_loss', 
+        factor = 0.5, 
+        patience = patient, 
+        min_lr=0.00001,
+        verbose=1,
+        mode='min'
+    ) 
     if use_neptune:        
-        callback = [NeptuneCallback()]
+        callback = [NeptuneCallback(), reduce]
     else:
-        callback = None
+        callback = [reduce]
     model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
         cifar.dev.data["images"], y_dev), batch_size=args.batch_size)
 
