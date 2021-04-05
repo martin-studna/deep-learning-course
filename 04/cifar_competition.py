@@ -52,7 +52,7 @@ parser.add_argument("--learning_rate", default=0.02,
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
 parser.add_argument("--l2", default=0.000, type=float,
                     help="L2 regularization.")
-parser.add_argument("--epochs", default=70,
+parser.add_argument("--epochs", default=100,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=32, type=int,
@@ -102,6 +102,8 @@ def main(args):
     x = BatchNormalization()(x)
     x = Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
     x = BatchNormalization()(x)
+    x = Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
+    x = BatchNormalization()(x)
     x = MaxPooling2D((2, 2))(x)
     x = Dropout(0.4)(x)
     x = Flatten()(x)
@@ -110,7 +112,8 @@ def main(args):
     #x = Dropout(0.5))
     x = Dense(10, activation='softmax')(x)
 
-    model = MyModel(inputs=[input], outputs=[x])
+    #model = MyModel(inputs=[input], outputs=[x])
+    model = Model(inputs=[input], outputs=[x])
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
@@ -154,25 +157,6 @@ def main(args):
 
     w,h,c = cifar.train.data["images"][0].shape
     
-    def train_augment(image, label):
-        if generator.uniform([]) >= 0.5:
-            image = tf.image.flip_left_right(image)
-
-        image = tf.image.resize_with_crop_or_pad(
-            image, CIFAR10.H + 6, CIFAR10.W + 6)
-
-        image = tf.image.resize(image, [generator.uniform([], minval=CIFAR10.H, maxval=CIFAR10.H + 12, dtype=tf.int32),
-                                        generator.uniform([], minval=CIFAR10.W, maxval=CIFAR10.W + 12, dtype=tf.int32)])
-
-        image = tf.image.crop_to_bounding_box(
-            image, target_height=CIFAR10.H, target_width=CIFAR10.W,
-            offset_height=generator.uniform([], maxval=tf.shape(
-                image)[0] - CIFAR10.H + 1, dtype=tf.int32),
-            offset_width=generator.uniform([], maxval=tf.shape(
-                image)[1] - CIFAR10.W + 1, dtype=tf.int32),
-        )
-        return image, label
-
     train = train.map(
     lambda image, label: (tf.image.resize_with_crop_or_pad(image, CIFAR10.H + 6, CIFAR10.W + 6), label), num_parallel_calls=10
 ).cache().shuffle(len(cifar.train.data["images"]), seed=args.seed).map(
@@ -191,7 +175,7 @@ def main(args):
     #         print(np.argmax(probs), file=predictions_file)
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
-    model.save('modeelsam.h5')
+    model.save('modeel2.h5')
     with open("cifar_competition_test.txt", "w", encoding="utf-8") as predictions_file:
         for probs in model.predict(cifar.test.data["images"], batch_size=args.batch_size):
             print(np.argmax(probs), file=predictions_file)
