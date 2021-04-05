@@ -54,7 +54,7 @@ parser.add_argument("--l2", default=0.000, type=float,
                     help="L2 regularization.")
 parser.add_argument("--epochs", default=100,
                     type=int, help="Number of epochs.")
-parser.add_argument("--seed", default=42, type=int, help="Random seed.")
+parser.add_argument("--seed", default=43, type=int, help="Random seed.")
 parser.add_argument("--threads", default=32, type=int,
                     help="Maximum number of threads to use.")
 
@@ -158,7 +158,7 @@ def main(args):
     w,h,c = cifar.train.data["images"][0].shape
     
     train = train.map(
-    lambda image, label: (tf.image.resize_with_crop_or_pad(image, CIFAR10.H + 6, CIFAR10.W + 6), label), num_parallel_calls=10
+    lambda image, label: (tf.image.resize(image, [CIFAR10.H + 6, CIFAR10.W + 6], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR), label), num_parallel_calls=10
 ).cache().shuffle(len(cifar.train.data["images"]), seed=args.seed).map(
     lambda image, label: (tf.image.random_flip_left_right(image), label)
 ).map(
