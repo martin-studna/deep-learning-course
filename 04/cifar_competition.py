@@ -172,10 +172,10 @@ def main(args):
         )
         return image, label
 
-    train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(train_augment, num_parallel_calls=100).batch(args.batch_size).prefetch(len(cifar.train.data["images"]))
+    train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(train_augment, num_parallel_calls=200).batch(args.batch_size).prefetch(len(cifar.train.data["images"]))
         
     model.fit(train, verbose=1, callbacks=callback,  validation_data=(
-        cifar.dev.data["images"], y_dev), epochs=args.epochs, workers=100, use_multiprocessing=True, max_queue_size=len(cifar.train.data["images"]))
+        cifar.dev.data["images"], y_dev), epochs=args.epochs, workers=200, use_multiprocessing=True, max_queue_size=len(cifar.train.data["images"]))
     
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
