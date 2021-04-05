@@ -126,17 +126,7 @@ def main(args):
     #model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
     #    cifar.dev.data["images"], y_dev))
 
-    '''
-    datagen = ImageDataGenerator(
-        width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
-
-
-    it_train = datagen.flow(
-        cifar.train.data["images"], y, batch_size=args.batch_size)
-
-    model.fit(it_train, epochs=args.epochs, verbose=1, callbacks=[NeptuneCallback()], validation_data=(
-        cifar.dev.data["images"], y_dev), batch_size=args.batch_size)
-    '''
+    
     patient = 4
     reduce = ReduceLROnPlateau(
         monitor = 'val_loss', 
@@ -150,9 +140,22 @@ def main(args):
         callback = [NeptuneCallback(), reduce]
     else:
         callback = [reduce]
+    
+    '''
     model.fit(cifar.train.data["images"], y, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
         cifar.dev.data["images"], y_dev), batch_size=args.batch_size)
 
+    '''
+    datagen = ImageDataGenerator(
+        width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
+    datagen.fit(cifar.train.data["images"])
+
+    it_train = datagen.flow(
+        cifar.train.data["images"], y, batch_size=args.batch_size)
+
+    model.fit(it_train, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
+        cifar.dev.data["images"], y_dev), batch_size=args.batch_size)
+    
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     # with open(os.path.join(args.logdir, "cifar_competition_test.txt"), "w", encoding="utf-8") as predictions_file:
