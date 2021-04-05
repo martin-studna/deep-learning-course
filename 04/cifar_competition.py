@@ -52,7 +52,7 @@ parser.add_argument("--learning_rate", default=0.02,
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
 parser.add_argument("--l2", default=0.000, type=float,
                     help="L2 regularization.")
-parser.add_argument("--epochs", default=200,
+parser.add_argument("--epochs", default=70,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=32, type=int,
@@ -174,6 +174,8 @@ def main(args):
 
     train = train.shuffle(len(cifar.train.data["images"]), seed=args.seed).map(
     lambda image, label: (tf.image.random_flip_left_right(image), label)
+).map(
+    lambda image, label: (tf.image.resize_with_crop_or_pad(image, CIFAR10.H + 6, CIFAR10.W + 6), label)
 ).prefetch(len(cifar.train.data["images"])//2).batch(args.batch_size)
         
     model.fit(train, verbose=1, callbacks=callback,  validation_data=(
