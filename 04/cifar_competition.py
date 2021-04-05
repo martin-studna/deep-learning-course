@@ -104,7 +104,7 @@ def main(args):
         x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
         x = BatchNormalization()(x)
         x = Conv2D(64//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
-        x = keras.layers.Concatenate()([x,r1])
+        #x = keras.layers.Concatenate()([x,r1])
         x = BatchNormalization()(x)        
         x = MaxPooling2D((2, 2))(x)
         x = Dropout(0.3)(x)
@@ -113,7 +113,7 @@ def main(args):
         x = BatchNormalization()(x)
         x = Conv2D(128//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2), kernel_initializer='he_uniform', padding='same')(x)
         x = BatchNormalization()(x)
-        x = keras.layers.Concatenate()([x,r2])
+        #x = keras.layers.Concatenate()([x,r2])
 
         x = MaxPooling2D((2, 2))(x)
         x = Dropout(0.4)(x)
@@ -173,12 +173,6 @@ def main(args):
             lambda image, label: (tf.image.random_flip_left_right(image), label)
         ).map(
             lambda image, label: (tf.image.random_crop(image, size=[CIFAR10.H, CIFAR10.W,3]) , label) , num_parallel_calls=10
-        ).map(
-            lambda image, label: (tf.image.random_saturation(image, 0.6, 1.6) , label) , num_parallel_calls=10
-        ).map(
-            lambda image, label: (tf.image.random_brightness(image, 0.05) , label) , num_parallel_calls=10
-        ).map(
-            lambda image, label: (tf.image.random_contrast(image, 0.7, 1.3) , label) , num_parallel_calls=10
         ).prefetch(len(cifar.train.data["images"])//2).batch(args.batch_size)
             
         model.fit(train, verbose=1, callbacks=callback,  validation_data=(
