@@ -39,7 +39,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=64*1, type=int, help="Batch size.")
+parser.add_argument("--batch_size", default=32*1, type=int, help="Batch size.")
 parser.add_argument("--learning_rate", default=0.001,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
@@ -113,7 +113,7 @@ def main(args):
 
 
     model.compile(
-        optimizer=tf.optimizers.SGD(
+        optimizer=tf.optimizers.Adam(
             learning_rate=args.learning_rate, momentum=args.momentum),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0.1),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
