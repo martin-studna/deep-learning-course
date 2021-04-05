@@ -43,7 +43,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=32*1, type=int, help="Batch size.")
+parser.add_argument("--batch_size", default=256, type=int, help="Batch size.")
 parser.add_argument("--learning_rate", default=0.00001,
                     type=int, help="Batch size.")
 parser.add_argument("--momentum", default=0.9, type=float, help="Momentum.")
@@ -121,7 +121,7 @@ def main(args):
         )
 
     model.compile(
-        optimizer='rmsprop',
+        optimizer=tf.keras.optimizers.RMSprop(learning_rate=0.2),
         loss=tf.losses.CategoricalCrossentropy(label_smoothing=0),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
