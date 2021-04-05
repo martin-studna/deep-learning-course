@@ -153,8 +153,10 @@ def main(args):
     it_train = datagen.flow(
         cifar.train.data["images"], y, batch_size=args.batch_size)
 
+    steps = int(np.ceil(cifar.train.data["images"].shape[0]/args.batch_size))
+
     model.fit(it_train, epochs=args.epochs, verbose=1, callbacks=callback, validation_data=(
-        cifar.dev.data["images"], y_dev), batch_size=args.batch_size)
+        cifar.dev.data["images"], y_dev), steps_per_epoch = steps)
     
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
