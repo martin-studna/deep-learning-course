@@ -110,7 +110,7 @@ def main(args):
     model.add(Dropout(0.5))
     model.add(Dense(10, activation='softmax'))
 
-    model = tf.keras.applications.EfficientNetB3(
+    model = tf.keras.applications.EfficientNetB0(
     include_top=True,
     weights=None,
     input_tensor=None,
