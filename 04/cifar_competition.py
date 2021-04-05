@@ -148,7 +148,7 @@ def main(args):
         
         patient = 4
         reduce = ReduceLROnPlateau(
-            monitor = 'loss', 
+            monitor = 'val_loss', 
             factor = 0.5, 
             patience = patient, 
             min_lr=0.00001,
