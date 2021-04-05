@@ -20,7 +20,7 @@ from tensorflow.keras.regularizers import l2
 from callback import NeptuneCallback
 from sam import SAM, sam_train_step
 
-use_neptune = False
+use_neptune = True
 if use_neptune:
     import neptune
     neptune.init(project_qualified_name='amdalifuk/cifar')
@@ -109,7 +109,7 @@ def main(args):
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=args.learning_rate),
-        loss=tf.losses.CategoricalCrossentropy(label_smoothing=None),
+        loss=tf.losses.CategoricalCrossentropy(label_smoothing=0),
         metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")]
     )
     y = tf.keras.utils.to_categorical(cifar.train.data["labels"])
