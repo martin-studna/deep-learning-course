@@ -116,7 +116,7 @@ def main(args):
     input_tensor=None,
     input_shape=cifar.train.data["images"][0].shape,
     pooling=None,
-    classes=1000,
+    classes=10,
     classifier_activation="softmax",
 )
 
