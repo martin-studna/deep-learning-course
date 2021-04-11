@@ -1,20 +1,15 @@
 import tensorflow as tf
 
 
-class SAM():
-    def __init__(self, base_optimizer, rho=0.05):
+class SAMModel(tf.keras.Sequential):
+    def __init__(self, params, base_optimizer, rho=0.05, **kwargs):
         assert rho >= 0.0, f"Invalid rho, should be non-negative: {rho}"
 
-        self.rho = rho
-        self.base_optimizer = base_optimizer
+        defaults = dict(rho=rho, **kwargs)
+        super(SAMModel, self).__init__(params, defaults)
 
-    def first_step(self, gradients, trainable_variables):
-        self.e_ws = []
-        grad_norm = tf.linalg.global_norm(trainable_variables)
-        for i in range(len(trainable_variables)):
-            e_w = gradients[i] * self.rho / (grad_norm + 1e-12)
-            trainable_variables[i].assign_add(e_w)
-            self.e_ws.append(e_w)
+        self.base_optimizer = base_optimizer(self.param_groups, **kwargs)
+        self.param_groups = self.base_optimizer.param_groups
 
     def second_step(self, gradients, trainable_variables):
         for i in range(len(trainable_variables)):
@@ -23,44 +18,50 @@ class SAM():
         self.base_optimizer.apply_gradients(
             zip(gradients, trainable_variables))
 
+    def first_step(self, zero_grad=False):
+        grad_norm = self._grad_norm()
+        for group in self.param_groups:
+            scale = group["rho"] / (grad_norm + 1e-12)
 
-# if you want to use model.fit(), override the train_step method of a model with this function, example is mnist_example_keras_fit.
-# for customization see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit/
-def sam_train_step(self, data, rho=0.05):
-    # Unpack the data. Its structure depends on your model and
-    # on what you pass to `fit()`.
-    x, y = data
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                e_w = p.grad * scale.to(p)
+                p.add_(e_w)  # climb to the local maximum "w + e(w)"
+                self.state[p]["e_w"] = e_w
 
-    with tf.GradientTape() as tape:
-        y_pred = self(x, training=True)  # Forward pass
-        # Compute the loss value
-        # (the loss function is configured in `compile()`)
-        loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
+        if zero_grad:
+            self.zero_grad()
 
-    # Compute gradients
-    trainable_vars = self.trainable_variables
-    gradients = tape.gradient(loss, trainable_vars)
+    def second_step(self, zero_grad=False):
+        for group in self.param_groups:
+            for p in group["params"]:
+                if p.grad is None:
+                    continue
+                # get back to "w" from "w + e(w)"
+                p.assign_sub(self.state[p]["e_w"])
 
-    # first step
-    e_ws = []
-    grad_norm = tf.linalg.global_norm(trainable_vars)
-    for i in range(len(trainable_vars)):
-        e_w = gradients[i] * rho / (grad_norm + 1e-12)
-        trainable_vars[i].assign_add(e_w)
-        e_ws.append(e_w)
+        self.base_optimizer.step()  # do the actual "sharpness-aware" update
 
-    with tf.GradientTape() as tape:
-        y_pred = self(x, training=True)  # Forward pass
-        # Compute the loss value
-        # (the loss function is configured in `compile()`)
-        loss = self.compiled_loss(y, y_pred, regularization_losses=self.losses)
-    trainable_vars = self.trainable_variables
-    gradients = tape.gradient(loss, trainable_vars)
+        if zero_grad:
+            self.zero_grad()
 
-    for i in range(len(trainable_vars)):
-        trainable_vars[i].assign_add(-e_ws[i])
-    self.optimizer.apply_gradients(zip(gradients, trainable_vars))
-    # Update metrics (includes the metric that tracks the loss)
-    self.compiled_metrics.update_state(y, y_pred)
-    # Return a dict mapping metric names to current value
-    return {m.name: m.result() for m in self.metrics}
+    def train_step(self, closure=None):
+        self.first_step(zero_grad=True)
+        self.second_step()
+
+    def _grad_norm(self):
+        # put everything on the same device, in case of model parallelism
+        shared_device = self.param_groups[0]["params"][0].device
+        norm = tf.norm(
+            tf.stack([
+                p.grad.norm(p=2).to(shared_device)
+                for group in self.param_groups for p in group["params"]
+                if p.grad is not None
+            ]),
+            p=2
+        )
+        return norm
+
+        # if you want to use model.fit(), override the train_step method of a model with this function, example is mnist_example_keras_fit.
+        # for customization see https://www.tensorflow.org/guide/keras/customizing_what_happens_in_fit/

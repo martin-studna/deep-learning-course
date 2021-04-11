@@ -7,28 +7,17 @@ import argparse
 import datetime
 import os
 import re
-<<<<<<< HEAD
-
-#import neptune
-
-#neptune.init(project_qualified_name='amdalifuk/c10', api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiZjkxYTA4NzYtMzk5OS00NDFmLTlmMWItNGNhNjU5NmQ1NDMxIn0=') # add your 
-
-# Report only TF errors by default
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-
-=======
 
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
 #import neptune
 
-#neptune.init(project_qualified_name='amdalifuk/c10', api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiZjkxYTA4NzYtMzk5OS00NDFmLTlmMWItNGNhNjU5NmQ1NDMxIn0=') # add your 
+# neptune.init(project_qualified_name='amdalifuk/c10', api_token='eyJhcGlfYWRkcmVzcyI6Imh0dHBzOi8vdWkubmVwdHVuZS5haSIsImFwaV91cmwiOiJodHRwczovL3VpLm5lcHR1bmUuYWkiLCJhcGlfa2V5IjoiZjkxYTA4NzYtMzk5OS00NDFmLTlmMWItNGNhNjU5NmQ1NDMxIn0=') # add your
 
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
->>>>>>> a7f1b5898891e45e5929d7743f461ec1fe659861
 np.random.seed(42)
 tf.random.set_seed(42)
 tf.config.threading.set_inter_op_parallelism_threads(4)
@@ -52,10 +41,11 @@ uppercase_data = UppercaseData(window, alphabet_size)
 labels = tf.keras.utils.to_categorical(uppercase_data.train.data["labels"])
 labels_dev = tf.keras.utils.to_categorical(uppercase_data.dev.data["labels"])
 
+
 def get_network():
-    
+
     l1l2_regularizer = None
-    
+
     if l2 != 0:
         l1l2_regularizer = tf.keras.regularizers.L1L2(l1=0, l2=l2)
 
@@ -63,20 +53,18 @@ def get_network():
         tf.keras.layers.InputLayer(
             input_shape=[2 * window + 1], dtype=tf.int32),
         tf.keras.layers.Lambda(lambda x: tf.one_hot(x, len(uppercase_data.train.alphabet)))])
-    
+
     model.add(tf.keras.layers.Flatten())
-    
+
     for hidden_layer in hidden_layers:
         model.add(tf.keras.layers.Dense(hidden_layer,
                   activation=afunkce, kernel_regularizer=l1l2_regularizer))
-        
+
         if dropout != 0:
             model.add(tf.keras.layers.Dropout(dropout))
-        
+
         if bn:
-            model.add(tf.keras.layers.BatchNormalization() )
-            
-            
+            model.add(tf.keras.layers.BatchNormalization())
 
     model.add(tf.keras.layers.Dense(2,
               activation=tf.nn.softmax, kernel_regularizer=l1l2_regularizer))
