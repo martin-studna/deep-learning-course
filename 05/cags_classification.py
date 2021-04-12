@@ -64,7 +64,7 @@ def main(args):
     train = cags.train.map(lambda example: (example["image"], example["label"])).take(-1).map(
         lambda image, label: (tf.image.resize_with_crop_or_pad(image, cags.H + 20, cags.W + 20), label), num_parallel_calls=10
         ).cache()
-    train = train.shuffle(500).map(
+    train = train.shuffle(l).map(
             lambda image, label: (tf.image.random_flip_left_right(image), label)
         ).map(
             lambda image, label: (tf.image.random_crop(image, size=[cags.H, cags.W,3]) , label) , num_parallel_calls=10
@@ -81,6 +81,7 @@ def main(args):
     efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(include_top=False)
     efficientnet_b0.trainable= False
     x = tf.keras.layers.Dense( 500, activation='relu' )(efficientnet_b0.output[0])
+    x = tf.keras.layers.Dropout(0.2)(x)
     x = tf.keras.layers.Dense( 500, activation='relu' )(efficientnet_b0.output[0])
     x = tf.keras.layers.Dense( len(cags.LABELS), activation='softmax' )(x)
     # TODO: Create the model and train it
