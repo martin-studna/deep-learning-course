@@ -65,7 +65,7 @@ def main(args):
     train = cags.train.map(lambda example: (example["image"], example["label"])).batch(args.batch_size).take(-1).cache()
     '''
     train = cags.train.map(lambda example: (example["image"], example["label"])).take(-1).map(
-        lambda image, label: (tf.image.resize_with_crop_or_pad(image, cags.H + 20, cags.W + 20), label), num_parallel_calls=10
+        lambda image, label: (tf.image.resize_with_crop_or_pad(image, cags.H + 80, cags.W + 80), label), num_parallel_calls=10
         ).cache()
     train = train.shuffle(l).map(
             lambda image, label: (tf.image.random_flip_left_right(image), label)
