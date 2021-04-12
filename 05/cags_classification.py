@@ -75,13 +75,23 @@ def main(args):
 
 
 
-
+    from tensorflow.python.framework.ops import disable_eager_execution
+    #disable_eager_execution()
 
     l = 2142
+
+
     '''
-    train = cags.train.map(lambda example: (example["image"], example["label"])).batch(args.batch_size).take(-1).cache()
+    train = cags.train.map(lambda example: (example["image"], example["label"] )).batch(args.batch_size).take(-1).cache()
     '''
-    train = cags.train.map(lambda example: (example["image"], tf.keras.utils.to_categorical( example["label"],num_classes=len(cags.LABELS) ) )).take(-1).map(
+     
+    a = list( cags.train.map(lambda example: (example["image"], example["label"] ) ).batch(2142) )
+    x = a[0][0].numpy()
+    y = a[0][1].numpy()
+    y_cat = tf.keras.utils.to_categorical(y, num_classes=len(cags.LABELS) )
+    train = tf.data.Dataset.from_tensor_slices((x,y))
+    #train = cags.train.map(lambda example: (example["image"], example["label"] ) )
+    train = train.take(-1).map(
         lambda image, label: (tf.image.resize_with_crop_or_pad(image, cags.H + 40, cags.W + 40), label), num_parallel_calls=10
         ).cache()
     train = train.shuffle(l).map(
@@ -92,7 +102,13 @@ def main(args):
             lambda image, label: (tf.image.random_crop(image, size=[cags.H, cags.W,3]) , label) , num_parallel_calls=10
         ).batch(args.batch_size)
     
-    dev = cags.dev.map(lambda example: (example["image"], example["label"])).take(-1).cache()
+    a = list( cags.dev.map(lambda example: (example["image"], example["label"] ) ).batch(2142) )
+    x = a[0][0].numpy()
+    y = a[0][1].numpy()
+    y_cat = tf.keras.utils.to_categorical(y, num_classes=len(cags.LABELS) )
+    dev = tf.data.Dataset.from_tensor_slices((x,y))
+    #dev = cags.dev.map(lambda example: (example["image"], example["label"]))
+    dev = dev.take(-1).cache()
     dev = dev.batch(args.batch_size)
 
     test = cags.test.map(lambda example: (example["image"], example["label"]))
@@ -113,8 +129,8 @@ def main(args):
     lr_decayed_fn = tf.keras.experimental.CosineDecay(args.learning_rate, decay_steps)
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True), 
-    loss=tf.keras.losses.CategoricalCrossentropy(), 
-    metrics=[tf.keras.metrics.CategoricalAccuracy(name='sparse_categorical_accuracy'   )] 
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(), 
+    metrics=[tf.keras.metrics.SparseCategoricalAccuracy(name='sparse_categorical_accuracy'   )] 
     )
 
 
