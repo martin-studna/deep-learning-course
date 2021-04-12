@@ -1,17 +1,5 @@
 #!/usr/bin/env python3
-from tensorflow.keras.callbacks import ReduceLROnPlateau
-from os import environ
-import neptune
-from sam import sam_train_step
 from callback import NeptuneCallback
-from tensorflow.keras.regularizers import l2
-from tensorflow.keras.layers import Flatten
-from tensorflow.keras.layers import Dropout
-from tensorflow.keras.layers import BatchNormalization
-from tensorflow.keras.layers import Dense
-from tensorflow.keras.layers import MaxPooling2D
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.layers import Conv2D
 from tensorflow.keras.models import Model
 import efficient_net
 from cags_dataset import CAGS
@@ -28,12 +16,6 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
 
-# neptune.init(project_qualified_name='amdalifuk/cags')
-# Report only TF errors by default
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-environ["KERAS_BACKEND"] = "plaidml.keras.backend"
-
-
 use_neptune = True
 if use_neptune:
     import neptune
@@ -42,27 +24,14 @@ if use_neptune:
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=201, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=3,
-                    type=int, help="Number of epochs.")
-parser.add_argument("--steps_per_epoch", default=10,
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=None,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-
-parser.add_argument("--threads", default=1, type=int,
-                    help="Maximum number of threads to use.")
-
-
-class SAMModel(Model):
-    def train_step(self, data):
-        return sam_train_step(self, data)
-
-
 parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
 parser.add_argument("--learning_rate", default=0.01,
                     type=int, help="Learning rate.")
-parser.add_argument("--learning_rate", default=0.01, type=int, help="Use LR .")
 
 
 def main(args):
@@ -109,16 +78,12 @@ def main(args):
     x = tf.keras.layers.Dense(len(cags.LABELS), activation='softmax')(
         efficientnet_b0.output[0])
     # TODO: Create the model and train it
-    model = SAMModel(inputs=[efficientnet_b0.input], outputs=[x])
+    model = Model(inputs=[efficientnet_b0.input], outputs=[x])
 
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(),
-        loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=['accuracy'])
-    model.fit(train, validation_data=dev, steps_per_epoch=args.steps_per_epoch,
-              epochs=args.epochs, batch_size=(args.epochs * args.steps_per_epoch))
+    model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=[
+                  'SparseCategoricalAccuracy'])
 
-    model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy,
-                  metrics=['SparseCategoricalAccuracy'])
+    from tensorflow.keras.callbacks import ReduceLROnPlateau
 
     reduce = ReduceLROnPlateau(
         monitor='val_loss',
