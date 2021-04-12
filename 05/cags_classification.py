@@ -15,7 +15,6 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
-
 use_neptune = True
 if use_neptune:
     import neptune
@@ -32,6 +31,8 @@ parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
 parser.add_argument("--learning_rate", default=0.01,
                     type=int, help="Learning rate.")
+parser.add_argument("--use_lrplatau", default=True,
+                    type=int, help="Use LR decay on platau")
 
 
 def main(args):
@@ -46,7 +47,7 @@ def main(args):
             'learning_rate': args.learning_rate,
             'epochs': args.epochs,
             'threads': args.threads
-        }, abort_callback=lambda: run_shutdown_logic_and_exit())
+        }, abort_callback=lambda: neptune.stop())
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -96,10 +97,10 @@ def main(args):
     callback = []
     if use_neptune:
         callback.append(NeptuneCallback())
-    if args.use_l:
+    if args.use_lrplatau:
         callback.append(reduce)
 
-    model.fit(train, validation_data=dev, epochs=10, callbacks=callback)
+    model.fit(train, validation_data=dev, epochs=2, callbacks=callback)
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:

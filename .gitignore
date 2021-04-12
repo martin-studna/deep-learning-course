@@ -140,3 +140,6 @@ logs
 03/uppercase_data.zip
 uppercase_data.zip
 03/.vs/
+05/cags.dev.tfrecord
+05/cags.test.tfrecord
+05/cags.train.tfrecord
