@@ -81,6 +81,7 @@ def main(args):
     efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(include_top=False)
     efficientnet_b0.trainable= False
     x = tf.keras.layers.Dense( 500, activation='relu' )(efficientnet_b0.output[0])
+    x = tf.keras.layers.Dense( 500, activation='relu' )(efficientnet_b0.output[0])
     x = tf.keras.layers.Dense( len(cags.LABELS), activation='softmax' )(x)
     # TODO: Create the model and train it
     model = Model(inputs=[efficientnet_b0.input], outputs=[x] )
