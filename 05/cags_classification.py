@@ -9,13 +9,20 @@ import numpy as np
 import argparse
 import datetime
 import os
+from os import environ
 import re
+from sam import sam_train_step
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 environ["KERAS_BACKEND"] = "plaidml.keras.backend"
+
+
+class MyModel(Model):
+    def train_step(self, data):
+        return sam_train_step(self, data)
 
 
 use_neptune = True
@@ -100,7 +107,7 @@ def main(args):
     hidden = tf.keras.layers.Dense(
         len(CAGS.LABELS), activation=tf.nn.softmax)(hidden)
     # TODO: Create the model and train it
-    model = Model(inputs=[efficientnet_b0.input], outputs=[hidden])
+    model = MyModel(inputs=[efficientnet_b0.input], outputs=[hidden])
 
     '''
     a1 = list( train.take(1) )[0][0][0].numpy()
