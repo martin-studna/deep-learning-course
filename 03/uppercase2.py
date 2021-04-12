@@ -6,6 +6,8 @@ import numpy as np
 import argparse
 import datetime
 import os
+from os import environ
+
 import re
 
 import neptune
