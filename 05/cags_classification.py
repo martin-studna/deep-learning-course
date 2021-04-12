@@ -125,6 +125,19 @@ def main(args):
 
 
     model.fit(train, validation_data=dev, epochs=args.epochs, callbacks=callback)
+
+    fine_tune_at = 150
+    for layer in model.layers[fine_tune_at:]:
+        layer.trainable = True
+
+    model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True), 
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(), 
+        metrics=['SparseCategoricalAccuracy'] 
+        )
+        
+    model.fit(train, validation_data=dev, epochs=args.epochs, callbacks=callback)
+
+
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
