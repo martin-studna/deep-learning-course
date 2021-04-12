@@ -61,6 +61,8 @@ def main(args):
     # Load the data
     cags = CAGS()
     l = 2142
+    train = cags.train.map(lambda example: (example["image"], example["label"]))
+    '''
     train = cags.train.map(lambda example: (example["image"], example["label"])).take(-1).map(
         lambda image, label: (tf.image.resize_with_crop_or_pad(image, cags.H + 20, cags.W + 20), label), num_parallel_calls=10
         ).cache()
@@ -69,7 +71,7 @@ def main(args):
         ).map(
             lambda image, label: (tf.image.random_crop(image, size=[cags.H, cags.W,3]) , label) , num_parallel_calls=10
         ).batch(args.batch_size)
-
+    '''
     dev = cags.dev.map(lambda example: (example["image"], example["label"])).take(-1).cache()
     dev = dev.batch(args.batch_size)
 
@@ -134,7 +136,7 @@ def main(args):
         loss=tf.keras.losses.SparseCategoricalCrossentropy(), 
         metrics=['SparseCategoricalAccuracy'] 
         )
-        
+
     model.fit(train, validation_data=dev, epochs=args.epochs, callbacks=callback)
 
 
