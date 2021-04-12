@@ -21,7 +21,7 @@ from callback import NeptuneCallback
 from sam import SAM, sam_train_step
 import neptune
 from os import environ
-neptune.init(project_qualified_name='amdalifuk/cifar')
+neptune.init(project_qualified_name='amdalifuk/cags')
 
 
 class MyModel(Sequential):
@@ -80,7 +80,7 @@ def main(args):
     #model = MyModel()
     model = Sequential()
     model.add(Conv2D(32//v, (3, 3), activation='relu',
-              kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
+                     kernel_initializer='he_uniform', padding='same', kernel_regularizer=l2(args.l2), input_shape=(32, 32, 3)))
     model.add(BatchNormalization())
     model.add(Conv2D(32//v, (3, 3), activation='relu', kernel_regularizer=l2(args.l2),
                      kernel_initializer='he_uniform', padding='same'))

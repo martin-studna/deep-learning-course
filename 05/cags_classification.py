@@ -8,18 +8,42 @@ import argparse
 import datetime
 import os
 import re
+from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.regularizers import l2
+from callback import NeptuneCallback
+from sam import sam_train_step
+import neptune
+from os import environ
+# neptune.init(project_qualified_name='amdalifuk/cags')
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+environ["KERAS_BACKEND"] = "plaidml.keras.backend"
 
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None,
+parser.add_argument("--batch_size", default=201, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=3,
+                    type=int, help="Number of epochs.")
+parser.add_argument("--steps_per_epoch", default=10,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
+
+
+class SAMModel(Model):
+    def train_step(self, data):
+        return sam_train_step(self, data)
 
 
 def main(args):
@@ -58,12 +82,13 @@ def main(args):
     x = tf.keras.layers.Dense(len(cags.LABELS), activation='softmax')(
         efficientnet_b0.output[0])
     # TODO: Create the model and train it
-    model = Model(inputs=[efficientnet_b0.input], outputs=[x])
+    model = SAMModel(inputs=[efficientnet_b0.input], outputs=[x])
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(),
         loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=['accuracy'])
-    model.fit(train, steps_per_epoch=67, validation_data=dev)
+    model.fit(train, validation_data=dev, steps_per_epoch=args.steps_per_epoch,
+              epochs=args.epochs, batch_size=(args.epochs * args.steps_per_epoch))
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
