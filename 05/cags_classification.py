@@ -44,24 +44,12 @@ if use_neptune:
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=3,
-                    type=int, help="Number of epochs.")
+parser.add_argument("--batch_size", default=128, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=100, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int,
-                    help="Maximum number of threads to use.")
-parser.add_argument("--learning_rate", default=0.01,
-                    type=int, help="Learning rate.")
-parser.add_argument("--use_lrplatau", default=True,
-                    type=int, help="Use LR decay on platau")
-
-
-def tfds_imgen(ds, imgen, batch_size=0, batches_per=0):
-    for images, labels in ds:
-        flow_ = imgen.flow(images, labels, batch_size=batch_size)
-        for _ in range(batches_per):
-            yield next(flow_)
-
+parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument("--learning_rate", default=0.05, type=int, help="Learning rate.")
+parser.add_argument("--use_lrplatau", default=False, type=int, help="Use LR decay on platau")
 
 def main(args):
     # Fix random seeds and threads
@@ -74,8 +62,9 @@ def main(args):
             'batch_size': args.batch_size,
             'learning_rate': args.learning_rate,
             'epochs': args.epochs,
-            'threads': args.threads
-        }, abort_callback=lambda: neptune.stop())
+            'use_lrplatau': args.use_lrplatau
+        },abort_callback=lambda: neptune.stop() )
+        neptune.send_artifact('cags_classification.py')
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -87,26 +76,49 @@ def main(args):
 
     # Load the data
     cags = CAGS()
-
-    train = cags.train.map(lambda example: (
-        example["image"], example["label"]))
-    train = train.shuffle(200).batch(args.batch_size)
-
-    dev = cags.dev.map(lambda example: (example["image"], example["label"]))
-    dev = dev.shuffle(200).batch(args.batch_size)
+    l = 2142
+    '''
+    train = cags.train.map(lambda example: (example["image"], example["label"])).batch(args.batch_size).take(-1).cache()
+    '''
+    train = cags.train.map(lambda example: (example["image"], example["label"])).take(-1).map(
+        lambda image, label: (tf.image.resize_with_crop_or_pad(image, cags.H + 80, cags.W + 80), label), num_parallel_calls=10
+        ).cache()
+    train = train.shuffle(l).map(
+            lambda image, label: (tf.image.random_flip_left_right(image), label)
+        ).map(
+            lambda image, label: (tf.image.random_crop(image, size=[cags.H, cags.W,3]) , label) , num_parallel_calls=10
+        ).batch(args.batch_size)
+    
+    dev = cags.dev.map(lambda example: (example["image"], example["label"])).take(-1).cache()
+    dev = dev.batch(args.batch_size)
 
     test = cags.test.map(lambda example: (example["image"], example["label"]))
     test = test.batch(args.batch_size)
 
     # Load the EfficientNet-B0 model
-    efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(
-        include_top=False)
-    efficientnet_b0.trainable = False
-
-    x = tf.keras.layers.Dense(len(cags.LABELS), activation='softmax')(
-        efficientnet_b0.output[0])
+    efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(include_top=False)
+    efficientnet_b0.trainable= False
+    
+    x = tf.keras.layers.Dense( 1000, activation='relu' )(efficientnet_b0.output[0])
+    x = tf.keras.layers.Dense( len(cags.LABELS), activation='softmax' )(x)
     # TODO: Create the model and train it
-    model = MyModel(inputs=[efficientnet_b0.input], outputs=[x])
+    model = Model(inputs=[efficientnet_b0.input], outputs=[x] )
+
+    '''
+    a1 = list( train.take(1) )[0][0][0].numpy()
+    import cv2
+    cv2.namedWindow('now', cv2.WINDOW_NORMAL)
+    cv2.imshow("now", a1)
+    cv2.waitKey(0)
+    '''
+
+    decay_steps = args.epochs * l / args.batch_size
+    lr_decayed_fn = tf.keras.experimental.CosineDecay(args.learning_rate, decay_steps)
+
+    model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True), 
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(), 
+    metrics=['SparseCategoricalAccuracy'] 
+    )
 
     model.compile(optimizer=tf.optimizers.Adam(learning_rate=args.learning_rate),
                   loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=[
@@ -136,8 +148,20 @@ def main(args):
                           datagen, batch_size=32, batches_per=96)
     #steps = int(cags.train.example["image"].shape[0] / args.batch_size)
 
-    model.fit(it_train, validation_data=dev, steps_per_epoch=20,
-              epochs=args.epochs, callbacks=callback)
+    model.fit(train, validation_data=dev, epochs=args.epochs, callbacks=callback)
+
+    fine_tune_at = 150
+    for layer in model.layers[fine_tune_at:]:
+        layer.trainable = True
+
+    model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True), 
+        loss=tf.keras.losses.SparseCategoricalCrossentropy(), 
+        metrics=['SparseCategoricalAccuracy'] 
+        )
+
+    model.fit(train, validation_data=dev, epochs=args.epochs, callbacks=callback)
+
+
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
