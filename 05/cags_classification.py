@@ -9,11 +9,32 @@ import argparse
 import datetime
 import os
 import re
+from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Conv2D
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.layers import MaxPooling2D
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import BatchNormalization
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.regularizers import l2
+from sam import sam_train_step
+from os import environ
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
+
+
+class MyModel(tf.keras.models.Model):
+    def train_step(self, data):
+        return sam_train_step(self, data)
+
+
+environ["KERAS_BACKEND"] = "plaidml.keras.backend"
 
 use_neptune = True
 if use_neptune:
@@ -24,7 +45,7 @@ if use_neptune:
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None,
+parser.add_argument("--epochs", default=3,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
@@ -33,6 +54,13 @@ parser.add_argument("--learning_rate", default=0.01,
                     type=int, help="Learning rate.")
 parser.add_argument("--use_lrplatau", default=True,
                     type=int, help="Use LR decay on platau")
+
+
+def tfds_imgen(ds, imgen, batch_size=0, batches_per=0):
+    for images, labels in ds:
+        flow_ = imgen.flow(images, labels, batch_size=batch_size)
+        for _ in range(batches_per):
+            yield next(flow_)
 
 
 def main(args):
@@ -78,10 +106,11 @@ def main(args):
     x = tf.keras.layers.Dense(len(cags.LABELS), activation='softmax')(
         efficientnet_b0.output[0])
     # TODO: Create the model and train it
-    model = Model(inputs=[efficientnet_b0.input], outputs=[x])
+    model = MyModel(inputs=[efficientnet_b0.input], outputs=[x])
 
-    model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=[
-                  'SparseCategoricalAccuracy'])
+    model.compile(optimizer=tf.optimizers.Adam(learning_rate=args.learning_rate),
+                  loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=[
+        'SparseCategoricalAccuracy'])
 
     from tensorflow.keras.callbacks import ReduceLROnPlateau
 
@@ -100,7 +129,15 @@ def main(args):
     if args.use_lrplatau:
         callback.append(reduce)
 
-    model.fit(train, validation_data=dev, epochs=2, callbacks=callback)
+    datagen = ImageDataGenerator(
+        width_shift_range=0.1, height_shift_range=0.1, horizontal_flip=True)
+
+    it_train = tfds_imgen(train.as_numpy_iterator(),
+                          datagen, batch_size=32, batches_per=96)
+    #steps = int(cags.train.example["image"].shape[0] / args.batch_size)
+
+    model.fit(it_train, validation_data=dev, steps_per_epoch=20,
+              epochs=args.epochs, callbacks=callback)
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
