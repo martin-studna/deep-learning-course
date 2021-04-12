@@ -39,7 +39,6 @@ def main(args):
     np.random.seed(args.seed)
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
-    tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
     if use_neptune:
         neptune.create_experiment(params={
