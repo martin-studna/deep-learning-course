@@ -61,7 +61,7 @@ def main(args):
     # Load the data
     cags = CAGS()
     l = 2142
-    train = cags.train.map(lambda example: (example["image"], example["label"]))
+    train = cags.train.map(lambda example: (example["image"], example["label"])).batch(args.batch_size)
     '''
     train = cags.train.map(lambda example: (example["image"], example["label"])).take(-1).map(
         lambda image, label: (tf.image.resize_with_crop_or_pad(image, cags.H + 20, cags.W + 20), label), num_parallel_calls=10
