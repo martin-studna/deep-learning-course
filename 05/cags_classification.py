@@ -27,12 +27,12 @@ if use_neptune:
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+parser.add_argument("--batch_size", default=128, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=20, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-parser.add_argument("--learning_rate", default=0.01, type=int, help="Learning rate.")
-parser.add_argument("--use_lrplatau", default=True, type=int, help="Use LR decay on platau")
+parser.add_argument("--learning_rate", default=0.05, type=int, help="Learning rate.")
+parser.add_argument("--use_lrplatau", default=False, type=int, help="Use LR decay on platau")
 
 def main(args):
     # Fix random seeds and threads
@@ -47,8 +47,9 @@ def main(args):
             'batch_size': args.batch_size,
             'learning_rate': args.learning_rate,
             'epochs': args.epochs,
-            'threads': args.threads
+            'use_lrplatau': args.use_lrplatau
         },abort_callback=lambda: neptune.stop() )
+        neptune.send_artifact('cags_classification.py')
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -59,12 +60,12 @@ def main(args):
 
     # Load the data
     cags = CAGS()
-
-    train = cags.train.map(lambda example: (example["image"], example["label"]))
+    l = 2142
+    train = cags.train.map(lambda example: (example["image"], example["label"])).take(-1).cache()
     train = train.shuffle(200).batch(args.batch_size)
 
-    dev = cags.dev.map(lambda example: (example["image"], example["label"]))
-    dev = dev.shuffle(200).batch(args.batch_size)
+    dev = cags.dev.map(lambda example: (example["image"], example["label"])).take(-1).cache()
+    dev = dev.batch(args.batch_size)
 
     test = cags.test.map(lambda example: (example["image"], example["label"]))
     test = test.batch(args.batch_size)
@@ -73,12 +74,26 @@ def main(args):
     # Load the EfficientNet-B0 model
     efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(include_top=False)
     efficientnet_b0.trainable= False
-
-    x = tf.keras.layers.Dense( len(cags.LABELS), activation='softmax' )(efficientnet_b0.output[0])
+    x = tf.keras.layers.Dense( 500, activation='relu' )(efficientnet_b0.output[0])
+    x = tf.keras.layers.Dense( len(cags.LABELS), activation='softmax' )(x)
     # TODO: Create the model and train it
     model = Model(inputs=[efficientnet_b0.input], outputs=[x] )
 
-    model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=['SparseCategoricalAccuracy'] )
+    '''
+    a1 = list( train.take(1) )[0][0][0].numpy()
+    import cv2
+    cv2.namedWindow('now', cv2.WINDOW_NORMAL)
+    cv2.imshow("now", a1)
+    cv2.waitKey(0)
+    '''
+
+    decay_steps = args.epochs * l / args.batch_size
+    lr_decayed_fn = tf.keras.experimental.CosineDecay(args.learning_rate, decay_steps)
+
+    model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True), 
+    loss=tf.keras.losses.sparse_categorical_crossentropy, 
+    metrics=['SparseCategoricalAccuracy'] 
+    )
 
 
     from tensorflow.keras.callbacks import ReduceLROnPlateau
@@ -100,7 +115,7 @@ def main(args):
 
 
 
-    model.fit(train, validation_data=dev, epochs=2, callbacks=callback)
+    model.fit(train, validation_data=dev, epochs=args.epochs, callbacks=callback)
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
