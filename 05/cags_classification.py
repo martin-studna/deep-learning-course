@@ -85,6 +85,8 @@ def main(args):
             lambda image, label: (tf.image.random_flip_left_right(image), label)
         ).map(
             lambda image, label: (tf.image.random_crop(image, size=[cags.H, cags.W,3]) , label) , num_parallel_calls=10
+        ).map(
+            lambda image, label: (tf.image.random_crop(image, size=[cags.H, cags.W,3]) , label) , num_parallel_calls=10
         ).batch(args.batch_size)
     
     dev = cags.dev.map(lambda example: (example["image"], example["label"])).take(-1).cache()
@@ -99,7 +101,7 @@ def main(args):
     efficientnet_b0.trainable= False
     
     #x = tf.keras.layers.Dense( 1000, activation='relu' )(efficientnet_b0.output[0])
-    x = tf.keras.layers.Dense( len(cags.LABELS), activation='softmax' )(efficientnet_b0.output[0])
+    x = tf.keras.layers.Dense( len(cags.LABELS), activation='softmax', kernel_regularizer=tf.keras.regularizers.L2(0.0001) )(efficientnet_b0.output[0])
     # TODO: Create the model and train it
     model = Model(inputs=[efficientnet_b0.input], outputs=[x] )
 
