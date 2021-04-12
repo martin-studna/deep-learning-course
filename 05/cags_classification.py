@@ -3,6 +3,9 @@ import argparse
 import datetime
 import os
 import re
+from tensorflow.python.keras.losses import SparseCategoricalCrossentropy
+
+from tensorflow.python.keras.utils.np_utils import to_categorical
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
 
 # 2f67b427-a885-11e7-a937-00505601122b
@@ -78,7 +81,7 @@ def main(args):
     '''
     train = cags.train.map(lambda example: (example["image"], example["label"])).batch(args.batch_size).take(-1).cache()
     '''
-    train = cags.train.map(lambda example: (example["image"], example["label"])).take(-1).map(
+    train = cags.train.map(lambda example: (example["image"], tf.keras.utils.to_categorical( example["label"],num_classes=len(cags.LABELS) ) )).take(-1).map(
         lambda image, label: (tf.image.resize_with_crop_or_pad(image, cags.H + 40, cags.W + 40), label), num_parallel_calls=10
         ).cache()
     train = train.shuffle(l).map(
@@ -110,8 +113,8 @@ def main(args):
     lr_decayed_fn = tf.keras.experimental.CosineDecay(args.learning_rate, decay_steps)
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True), 
-    loss=tf.keras.losses.SparseCategoricalCrossentropy(), 
-    metrics=['SparseCategoricalAccuracy'] 
+    loss=tf.keras.losses.CategoricalCrossentropy(), 
+    metrics=[tf.keras.metrics.CategoricalAccuracy(name='sparse_categorical_accuracy'   )] 
     )
 
 
