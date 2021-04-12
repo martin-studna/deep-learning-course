@@ -61,6 +61,7 @@ def main(args):
     # Load the data
     cags = CAGS()
     l = 2142
+    '''
     train = cags.train.map(lambda example: (example["image"], example["label"])).batch(args.batch_size).take(-1).cache()
     '''
     train = cags.train.map(lambda example: (example["image"], example["label"])).take(-1).map(
@@ -71,7 +72,7 @@ def main(args):
         ).map(
             lambda image, label: (tf.image.random_crop(image, size=[cags.H, cags.W,3]) , label) , num_parallel_calls=10
         ).batch(args.batch_size)
-    '''
+    
     dev = cags.dev.map(lambda example: (example["image"], example["label"])).take(-1).cache()
     dev = dev.batch(args.batch_size)
 
