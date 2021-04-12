@@ -1,7 +1,7 @@
 from tensorflow.keras.callbacks import Callback
 
 import neptune
-
+import tensorflow as tf
 
 class NeptuneCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
