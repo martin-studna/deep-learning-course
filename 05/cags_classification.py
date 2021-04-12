@@ -15,12 +15,24 @@ from cags_dataset import CAGS
 import efficient_net
 from tensorflow.keras.models import Model
 
+from callback import NeptuneCallback
+
+
+
+use_neptune = True
+if use_neptune:
+    import neptune
+    neptune.init(project_qualified_name='amdalifuk/cags-classification')
+
+
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument("--learning_rate", default=0.01, type=int, help="Learning rate.")
+parser.add_argument("--learning_rate", default=0.01, type=int, help="Use LR .")
 
 def main(args):
     # Fix random seeds and threads
@@ -28,6 +40,16 @@ def main(args):
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
+
+
+    
+    if use_neptune:        
+        neptune.create_experiment(params={
+            'batch_size': args.batch_size,
+            'learning_rate': args.learning_rate,
+            'epochs': args.epochs,
+            'threads': args.threads
+        },abort_callback=lambda: run_shutdown_logic_and_exit())
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -58,7 +80,28 @@ def main(args):
     model = Model(inputs=[efficientnet_b0.input], outputs=[x] )
 
     model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=['SparseCategoricalAccuracy'] )
-    model.fit(train, validation_data=dev, epochs=10)
+
+
+    from tensorflow.keras.callbacks import ReduceLROnPlateau
+
+    reduce = ReduceLROnPlateau(
+        monitor = 'val_loss', 
+        factor = 0.5, 
+        patience = 4, 
+        min_lr=0.00001,
+        verbose=1,
+        mode='min'
+    ) 
+
+    callback = []
+    if use_neptune:  
+        callback.append( NeptuneCallback() )  
+    if args.use_l:
+        callback.append(  reduce   )
+
+
+
+    model.fit(train, validation_data=dev, epochs=10, callbacks=callback)
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
