@@ -5,6 +5,9 @@ import os
 import re
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
 
+# 2f67b427-a885-11e7-a937-00505601122b
+# c751264b-78ee-11eb-a1a9-005056ad4f31
+
 import numpy as np
 import tensorflow as tf
 
@@ -55,7 +58,7 @@ def main(args):
     model = Model(inputs=[efficientnet_b0.input], outputs=[x] )
 
     model.compile(loss=tf.keras.losses.sparse_categorical_crossentropy, metrics=['SparseCategoricalAccuracy'] )
-    model.fit(train, steps_per_epoch=67 ,validation_data=dev)
+    model.fit(train, validation_data=dev, epochs=10)
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "cags_classification.txt"), "w", encoding="utf-8") as predictions_file:
