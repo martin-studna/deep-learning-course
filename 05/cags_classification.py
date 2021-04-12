@@ -80,9 +80,10 @@ def main(args):
     # Load the EfficientNet-B0 model
     efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(include_top=False)
     efficientnet_b0.trainable= False
-    x = tf.keras.layers.Dense( 500, activation='relu' )(efficientnet_b0.output[0])
-    x = tf.keras.layers.Dropout(0.2)(x)
-    x = tf.keras.layers.Dense( 500, activation='relu' )(efficientnet_b0.output[0])
+    x = tf.keras.layers.Dropout(0.5)(efficientnet_b0.output[0])
+    x = tf.keras.layers.Dense( 500, activation='relu' )(x)
+    x = tf.keras.layers.Dropout(0.5)(x)
+    x = tf.keras.layers.Dense( 500, activation='relu' )(x)
     x = tf.keras.layers.Dense( len(cags.LABELS), activation='softmax' )(x)
     # TODO: Create the model and train it
     model = Model(inputs=[efficientnet_b0.input], outputs=[x] )
@@ -99,7 +100,7 @@ def main(args):
     lr_decayed_fn = tf.keras.experimental.CosineDecay(args.learning_rate, decay_steps)
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True), 
-    loss=tf.keras.losses.sparse_categorical_crossentropy, 
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(), 
     metrics=['SparseCategoricalAccuracy'] 
     )
 
