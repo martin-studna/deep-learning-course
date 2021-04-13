@@ -20,6 +20,9 @@ from tensorflow.keras.models import Model
 
 from callback import NeptuneCallback
 
+from tensorflow.keras import mixed_precision
+policy = mixed_precision.Policy('mixed_float16')
+mixed_precision.set_global_policy(policy)
 
 
 use_neptune = True
