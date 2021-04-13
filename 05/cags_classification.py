@@ -25,7 +25,7 @@ policy = mixed_precision.Policy('mixed_float16')
 mixed_precision.set_global_policy(policy)
 
 
-use_neptune = True
+use_neptune = False
 if use_neptune:
     import neptune
     neptune.init(project_qualified_name='amdalifuk/cags-classification')
