@@ -27,7 +27,7 @@ if use_neptune:
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=128, type=int, help="Batch size.")
+parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=100, type=int,
                     help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
@@ -58,7 +58,8 @@ def main(args):
     cags = CAGS()
     l = 2142
     '''
-    train = cags.train.map(lambda example: (example["image"], example["mask"])).batch(args.batch_size).take(-1).cache()
+    train = cags.train.map(lambda example: (example["image"], example["mask"])).batch(
+        args.batch_size).take(-1).cache()
     '''
     train = cags.train.map(lambda example: (example["image"], example["mask"])).take(-1).map(
         lambda image, mask: (tf.image.resize_with_crop_or_pad(image, cags.H + 80, cags.W + 80), mask), num_parallel_calls=10
@@ -81,9 +82,11 @@ def main(args):
         include_top=False)
 
     x = tf.keras.layers.Dense(1000, activation='relu')(
-        efficientnet_b0.output[0])
-    x = tf.keras.layers.Dense(cags.H * cags.W * 1, activation='sigmoid')(x)
-    x = tf.keras.layers.Reshape([cags.H, cags.W, 1])(x)
+        efficientnet_b0.output[5])
+    x = tf.keras.layers.Conv2DTranspose(
+        1, 3, strides=2, padding='same', activation='sigmoid')(x)
+    #x = tf.keras.layers.Dense(cags.H * cags.W * 1, activation='sigmoid')(x)
+    #x = tf.keras.layers.Reshape([cags.H, cags.W, 1])(x)
 
     # TODO: Create the model and train it
     model = Model(inputs=[efficientnet_b0.input], outputs=[x])
@@ -103,7 +106,7 @@ def main(args):
     MeanIoUMetric = tf.keras.metrics.MeanIoU(num_classes=len(cags.LABELS))
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True),
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                  loss=tf.keras.losses.BinaryCrossentropy(),
                   metrics=[MeanIoUMetric]
                   )
 
@@ -132,7 +135,7 @@ def main(args):
         layer.trainable = True
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True),
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                  loss=tf.keras.losses.BinaryCrossentropy(),
                   metrics=[MeanIoUMetric]
                   )
 
