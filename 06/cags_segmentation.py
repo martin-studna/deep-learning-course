@@ -27,7 +27,7 @@ if use_neptune:
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
+parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=100, type=int,
                     help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
