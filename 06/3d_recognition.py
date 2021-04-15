@@ -3,7 +3,7 @@ import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1") # Report only TF errors by default
 
 import numpy as np
 import tensorflow as tf
@@ -22,11 +22,14 @@ if use_neptune:
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
+parser.add_argument("--batch_size", default=128, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=20, type=int, help="Number of epochs.")
 parser.add_argument("--modelnet", default=20, type=int, help="ModelNet dimension.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument("--learning_rate", default=0.005, type=int, help="Learning rate.")
+
+parser.add_argument("--use_lrplatau", default=False, type=int, help="Use LR decay on platau")
 
 def main(args):
     import tensorflow.keras as keras
@@ -45,7 +48,7 @@ def main(args):
             'epochs': args.epochs,
             'use_lrplatau': args.use_lrplatau
         }, abort_callback=lambda: neptune.stop())
-        neptune.send_artifact('cags_classification.py')
+        neptune.send_artifact('3d_recognition.py')
 
 
     # Create logdir name
@@ -67,36 +70,40 @@ def main(args):
     x_dev = modelnet.dev.data['voxels']
     y_dev = keras.utils.to_categorical( modelnet.dev.data['labels'] , classes_num) 
 
-    input_l = keras.Input(shape=(x[0].shape[0], x[0].shape[1], x[0].shape[2], x[0].shape[3] ), batch_size=args.batch_size )
-    l = keras.layers.Conv3D( 32, 3 )(input_l)
+    input_l = keras.Input(shape=(x[0].shape[0], x[0].shape[1], x[0].shape[2], x[0].shape[3] ) )
+    l = keras.layers.Conv3D( 64, 3 )(input_l)
     l = keras.layers.BatchNormalization()(l)
     l = keras.layers.ReLU()(l)    
     
-    l = keras.layers.Conv3D( 32, 3 )(l)
+    l = keras.layers.Conv3D( 64, 3 )(l)
     l = keras.layers.BatchNormalization()(l)
     l = keras.layers.ReLU()(l)    
     
-    l = keras.layers.Conv3D( 32, 3 )(l)
+    l = keras.layers.MaxPool3D()(l)
+
+    l = keras.layers.Conv3D( 64, 3 )(l)
     l = keras.layers.BatchNormalization()(l)
     l = keras.layers.ReLU()(l)
 
-    l = keras.layers.Conv3D( 32, 3 )(l)
+    l = keras.layers.Conv3D( 128, 3 )(l)
     l = keras.layers.BatchNormalization()(l)
     l = keras.layers.ReLU()(l)
 
-    l = keras.layers.Conv3D( 32, 3 )(l)
+
+    l = keras.layers.Conv3D( 128, 3 )(l)
     l = keras.layers.BatchNormalization()(l)
     l = keras.layers.ReLU()(l)
     
 
     l = keras.layers.Flatten()(l)
+    l = keras.layers.Dropout(0.2)(l)
     l = keras.layers.Dense(classes_num, activation='softmax')(l)
 
-    model = tf.keras.Model( inputs=[input_l], outputs=[l]       )
+    model = tf.keras.Model( inputs=[input_l], outputs=[l]    )
 
 
-    model.compile(optimizer=keras.optimizers.Adam(  learning_rate=0.01 ),
-    loss=keras.losses.CategoricalCrossentropy(label_smoothing=0),
+    model.compile(optimizer=keras.optimizers.Adam(  learning_rate=args.learning_rate ),
+    loss=keras.losses.CategoricalCrossentropy(label_smoothing=0.1),
     metrics=[keras.metrics.CategoricalAccuracy()]
     )
 
@@ -105,16 +112,18 @@ def main(args):
         callbacky.append(NeptuneCallback())
 
 
-    model.fit(x,y, validation_data=(x_dev, y_dev), epochs=args.epochs, callbacks=callbacky  )
+    model.fit(x, y, validation_data=(x_dev, y_dev), epochs=args.epochs, batch_size=args.batch_size, shuffle=True  )
 
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
-    with open(os.path.join(args.logdir, "3d_recognition.txt"), "w", encoding="utf-8") as predictions_file:
+    with open( "3d_recognition.txt", "w", encoding="utf-8") as predictions_file:
         # TODO: Predict the probabilities on the test set
-        test_probabilities = model.predict(...)
+        test_probabilities = model.predict(modelnet.test.data['voxels'])
 
         for probs in test_probabilities:
             print(np.argmax(probs), file=predictions_file)
+    neptune.send_artifact('3d_recognition.txt')
+    
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
