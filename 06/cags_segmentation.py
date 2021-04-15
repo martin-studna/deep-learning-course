@@ -8,6 +8,9 @@ import datetime
 import os
 import re
 
+
+from callback import NeptuneCallback
+
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
@@ -16,15 +19,24 @@ from tensorflow.keras.models import Model
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
+use_neptune = False
+if use_neptune:
+    import neptune
+    neptune.init(project_qualified_name='amdalifuk/cags-segmentation')
+
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None,
-                    type=int, help="Number of epochs.")
+parser.add_argument("--batch_size", default=128, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=100, type=int,
+                    help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
+parser.add_argument("--learning_rate", default=0.05,
+                    type=int, help="Learning rate.")
+parser.add_argument("--use_lrplatau", default=False,
+                    type=int, help="Use LR decay on platau")
 
 
 def main(args):
@@ -70,7 +82,8 @@ def main(args):
 
     x = tf.keras.layers.Dense(1000, activation='relu')(
         efficientnet_b0.output[0])
-    x = tf.keras.layers.Dense([cags.H, cags.W, 1], activation='sigmoid')(x)
+    x = tf.keras.layers.Dense(cags.H * cags.W * 1, activation='sigmoid')(x)
+    x = tf.keras.layers.Reshape([cags.H, cags.W, 1])(x)
 
     # TODO: Create the model and train it
     model = Model(inputs=[efficientnet_b0.input], outputs=[x])
@@ -87,7 +100,7 @@ def main(args):
     lr_decayed_fn = tf.keras.experimental.CosineDecay(
         args.learning_rate, decay_steps)
 
-    MeanIoUMetric = tf.keras.metrics.MeanIoU()
+    MeanIoUMetric = tf.keras.metrics.MeanIoU(num_classes=len(cags.LABELS))
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True),
                   loss=tf.keras.losses.SparseCategoricalCrossentropy(),
@@ -129,7 +142,7 @@ def main(args):
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     with open(os.path.join(args.logdir, "cags_segmentation.txt"), "w", encoding="utf-8") as predictions_file:
         # TODO: Predict the masks on the test set
-        test_masks = model.predict(...)
+        test_masks = model.predict(test)
 
         for mask in test_masks:
             zeros, ones, runs = 0, 0, []
