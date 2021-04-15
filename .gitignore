@@ -143,5 +143,7 @@ uppercase_data.zip
 05/cags.test.tfrecord
 05/cags.train.tfrecord
 
+*.tfrecord
+
 
 events.out*
