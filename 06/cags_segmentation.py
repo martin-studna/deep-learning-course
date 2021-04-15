@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+from tensorflow.keras.models import Model
+from callback import NeptuneCallback
 import efficient_net
 from cags_dataset import CAGS
 import tensorflow as tf
@@ -6,15 +8,15 @@ import numpy as np
 import argparse
 import datetime
 import os
+from os import environ
 import re
 
+environ["KERAS_BACKEND"] = "plaidml.keras.backend"
 
-from callback import NeptuneCallback
 
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
-from tensorflow.keras.models import Model
 
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
@@ -28,7 +30,7 @@ if use_neptune:
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=100, type=int,
+parser.add_argument("--epochs", default=10, type=int,
                     help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
