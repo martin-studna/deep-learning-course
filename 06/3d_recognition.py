@@ -9,6 +9,16 @@ import numpy as np
 import tensorflow as tf
 
 from modelnet import ModelNet
+from callback import NeptuneCallback
+
+# 2f67b427-a885-11e7-a937-00505601122b
+# c751264b-78ee-11eb-a1a9-005056ad4f31
+
+use_neptune = True
+if use_neptune:
+    import neptune
+    neptune.init(project_qualified_name='amdalifuk/3d-recognition')
+
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
@@ -19,11 +29,24 @@ parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 
 def main(args):
+    import tensorflow.keras as keras
+
     # Fix random seeds and threads
     np.random.seed(args.seed)
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
+
+
+    if use_neptune:
+        neptune.create_experiment(params={
+            'batch_size': args.batch_size,
+            'learning_rate': args.learning_rate,
+            'epochs': args.epochs,
+            'use_lrplatau': args.use_lrplatau
+        }, abort_callback=lambda: neptune.stop())
+        neptune.send_artifact('cags_classification.py')
+
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
@@ -36,7 +59,54 @@ def main(args):
     modelnet = ModelNet(args.modelnet)
 
     # TODO: Create the model and train it
-    model = ...
+    classes_num = len(modelnet.LABELS)
+    #modelnet.train.data['voxels']
+    #modelnet.train.data['labels']
+    x = modelnet.train.data['voxels']
+    y = keras.utils.to_categorical( modelnet.train.data['labels'] , classes_num) 
+    x_dev = modelnet.dev.data['voxels']
+    y_dev = keras.utils.to_categorical( modelnet.dev.data['labels'] , classes_num) 
+
+    input_l = keras.Input(shape=(x[0].shape[0], x[0].shape[1], x[0].shape[2], x[0].shape[3] ), batch_size=args.batch_size )
+    l = keras.layers.Conv3D( 32, 3 )(input_l)
+    l = keras.layers.BatchNormalization()(l)
+    l = keras.layers.ReLU()(l)    
+    
+    l = keras.layers.Conv3D( 32, 3 )(l)
+    l = keras.layers.BatchNormalization()(l)
+    l = keras.layers.ReLU()(l)    
+    
+    l = keras.layers.Conv3D( 32, 3 )(l)
+    l = keras.layers.BatchNormalization()(l)
+    l = keras.layers.ReLU()(l)
+
+    l = keras.layers.Conv3D( 32, 3 )(l)
+    l = keras.layers.BatchNormalization()(l)
+    l = keras.layers.ReLU()(l)
+
+    l = keras.layers.Conv3D( 32, 3 )(l)
+    l = keras.layers.BatchNormalization()(l)
+    l = keras.layers.ReLU()(l)
+    
+
+    l = keras.layers.Flatten()(l)
+    l = keras.layers.Dense(classes_num, activation='softmax')(l)
+
+    model = tf.keras.Model( inputs=[input_l], outputs=[l]       )
+
+
+    model.compile(optimizer=keras.optimizers.Adam(  learning_rate=0.01 ),
+    loss=keras.losses.CategoricalCrossentropy(label_smoothing=0),
+    metrics=[keras.metrics.CategoricalAccuracy()]
+    )
+
+    callbacky = []
+    if use_neptune:
+        callbacky.append(NeptuneCallback())
+
+
+    model.fit(x,y, validation_data=(x_dev, y_dev), epochs=args.epochs, callbacks=callbacky  )
+
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     with open(os.path.join(args.logdir, "3d_recognition.txt"), "w", encoding="utf-8") as predictions_file:
