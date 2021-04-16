@@ -4,6 +4,7 @@ from callback import NeptuneCallback
 import efficient_net
 from cags_dataset import CAGS
 import tensorflow as tf
+import tensorflow_addons as tfa
 import numpy as np
 import argparse
 import datetime
@@ -29,13 +30,13 @@ if use_neptune:
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
+parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=10, type=int,
                     help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
-parser.add_argument("--learning_rate", default=0.05,
+parser.add_argument("--learning_rate", default=0.001,
                     type=int, help="Learning rate.")
 parser.add_argument("--use_lrplatau", default=False,
                     type=int, help="Use LR decay on platau")
@@ -105,11 +106,14 @@ def main(args):
     lr_decayed_fn = tf.keras.experimental.CosineDecay(
         args.learning_rate, decay_steps)
 
-    MeanIoUMetric = tf.keras.metrics.MeanIoU(num_classes=len(cags.LABELS))
+    meanIoUMetric = tf.keras.metrics.MeanIoU(
+        num_classes=len(cags.LABELS), name="MeanIoU-metric")
+    globalIoULoss = tfa.losses.GIoULoss(
+        reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True),
-                  loss=tf.keras.losses.BinaryCrossentropy(),
-                  metrics=[MeanIoUMetric]
+                  loss='mse',
+                  metrics=[tf.keras.metrics.Accuracy(), meanIoUMetric]
                   )
 
     from tensorflow.keras.callbacks import ReduceLROnPlateau
@@ -137,8 +141,8 @@ def main(args):
         layer.trainable = True
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True),
-                  loss=tf.keras.losses.BinaryCrossentropy(),
-                  metrics=[MeanIoUMetric]
+                  loss='mse',
+                  metrics=[tf.keras.metrics.Accuracy(), meanIoUMetric]
                   )
 
     model.fit(train, validation_data=dev,
