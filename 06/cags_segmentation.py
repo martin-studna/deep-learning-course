@@ -103,6 +103,7 @@ def main(args):
 
     efficientnet_b0.trainable = False
 
+    #x = keras.layers.Conv2D(512, 3, padding='same', activation='relu')(efficientnet_b0.output[1])
 
     x = tf.keras.layers.Conv2DTranspose(256, 3, strides=2, padding='same', activation='relu')(efficientnet_b0.output[1])
     x = keras.layers.Concatenate()([x, efficientnet_b0.output[2]])
@@ -220,7 +221,7 @@ def main(args):
     model.fit(train, validation_data=dev,
               epochs=args.epochs, callbacks=callback)
     '''
-    save(model)
+    save()
 
 
 if __name__ == "__main__":
