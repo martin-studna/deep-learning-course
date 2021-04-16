@@ -207,7 +207,7 @@ def main(args):
         callback.append(reduce)
 
     model.fit(train, validation_data=dev, epochs=args.epochs)
-
+    '''
     fine_tune_at = 150
     for layer in model.layers[fine_tune_at:]:
         layer.trainable = True
@@ -219,7 +219,7 @@ def main(args):
 
     model.fit(train, validation_data=dev,
               epochs=args.epochs, callbacks=callback)
-      
+    '''
     save(model)
 
 
