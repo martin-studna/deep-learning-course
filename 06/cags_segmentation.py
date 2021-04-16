@@ -71,7 +71,7 @@ def main(args):
         args.batch_size).take(-1).cache()
     '''
     train = cags.train.map(lambda example: (example["image"], example["mask"])).take(-1).map(
-        lambda image, mask: (tf.image.resize_with_crop_or_pad(image, cags.H + 80, cags.W + 80), mask), num_parallel_calls=10
+        lambda image, mask: (tf.image.resize_with_crop_or_pad(image, cags.H + 50, cags.W + 50), mask), num_parallel_calls=10
     ).cache()
     train = train.shuffle(l).map(
         lambda image, mask: (tf.image.random_flip_left_right(image), mask)
@@ -79,9 +79,9 @@ def main(args):
         lambda image, mask: (tf.image.random_crop(image, size=[cags.H, cags.W, 3]), mask), num_parallel_calls=10
     ).batch(args.batch_size)
 
-    train = cags.train.map(lambda example: (
-        example["image"], example["mask"])).take(-1).cache()
-    train = train.batch(args.batch_size)
+    #train = cags.train.map(lambda example: (
+    #    example["image"], example["mask"])).take(-1).cache()
+    #train = train.batch(args.batch_size)
 
     dev = cags.dev.map(lambda example: (
         example["image"], example["mask"])).take(-1).cache()
