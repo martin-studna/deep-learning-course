@@ -6,6 +6,7 @@ from cags_dataset import CAGS
 import tensorflow as tf
 import tensorflow_addons as tfa
 import tensorflow.keras as keras
+from tensorflow.keras.callbacks import Callback
 
 from tensorflow.keras.models import Model
 from callback import NeptuneCallback
@@ -36,7 +37,7 @@ if use_neptune:
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=40, type=int,
+parser.add_argument("--epochs", default=6, type=int,
                     help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
@@ -49,12 +50,41 @@ parser.add_argument("--use_lrplatau", default=False,
 
 
 def main(args):
+    #tf.compat.v1.disable_eager_execution()
     # Fix random seeds and threads
     np.random.seed(args.seed)
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
+    '''
+    os.environ['TF_DEVICE_MIN_SYS_MEMORY_IN_MB'] = '1050'
+    os.environ['TF_XLA_FLAGS']='--tf_xla_enable_xla_devices --tf_xla_auto_jit=fusible --tf_xla_cpu_global_jit --tf_xla_always_defer_compilation=false --tf_xla_enable_lazy_compilation=true'
+
+    os.environ['TF_ENABLE_GPU_GARBAGE_COLLECTION']='false'
+    os.environ['TF_FORCE_GPU_ALLOW_GROWTH']='true'
+
+    os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+
+    print('jit:',tf.config.optimizer.get_jit())
+    tf.config.optimizer.set_jit(True)
+    print('jit:',tf.config.optimizer.get_jit())
+    '''
+
+    #tf.config.experimental.enable_tensor_float_32_execution(True) #16 s 15 bez???
+
+    from tensorflow.keras import mixed_precision
+    policy = mixed_precision.Policy('mixed_float16')
+    #mixed_precision.set_global_policy(policy) #low acc (but quick)
+    
+    #tf.config.experimental.enable_mlir_graph_optimization()
+    #tf.config.run_functions_eagerly
+    #tf.compat.v1.enable_eager_execution()
+    #tf.config.run_functions_eagerly(True)
+    #tf.config.experimental_run_functions_eagerly(True)
+    
+    #tf.data.experimental.enable.debug_mode()
+    print(f"EAGER: {tf.executing_eagerly()}")
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
         os.path.basename(globals().get("__file__", "notebook")),
@@ -66,22 +96,64 @@ def main(args):
     # Load the data
     cags = CAGS()
     l = 2142
+
     '''
     train = cags.train.map(lambda example: (example["image"], example["mask"])).batch(
         args.batch_size).take(-1).cache()
     '''
-    train = cags.train.map(lambda example: (example["image"], example["mask"])).take(-1).map(
-        lambda image, mask: (tf.image.resize_with_crop_or_pad(image, cags.H + 50, cags.W + 50), mask), num_parallel_calls=10
-    ).cache()
-    train = train.shuffle(l).map(
-        lambda image, mask: (tf.image.random_flip_left_right(image), mask)
-    ).map(
-        lambda image, mask: (tf.image.random_crop(image, size=[cags.H, cags.W, 3]), mask), num_parallel_calls=10
-    ).batch(args.batch_size)
+    
+    generator = tf.random.Generator.from_seed(args.seed)
 
-    #train = cags.train.map(lambda example: (
-    #    example["image"], example["mask"])).take(-1).cache()
-    #train = train.batch(args.batch_size)
+    @tf.function
+    def augment_take_mask(data):        
+        return ( data['image'], data['mask'])
+
+    @tf.function
+    def augment_bigger(image, mask):  
+        image = tf.image.resize_with_crop_or_pad(image, cags.H + 30, cags.W + 30)
+        mask = tf.image.resize_with_crop_or_pad(mask, cags.H + 30, cags.W + 30)
+        return (image, mask)
+
+    @tf.function
+    def augment_flip(image, mask):  
+        #random_int =  generator.uniform([], maxval=10, dtype=tf.int32)
+        do_flip = generator.uniform([]) > 0.5
+        #if random_int > 0.5:
+        #tf.image.flip_left_right()
+        #image = tf.image.random_flip_left_right(image, random_int )
+        image = tf.cond(do_flip, lambda: tf.image.flip_left_right(image), lambda: image)
+        mask = tf.cond(do_flip, lambda: tf.image.flip_left_right(mask), lambda: mask)
+
+
+        return (image, mask)
+
+    @tf.function
+    def augment_crop(image, mask):  
+        #random_int = generator.uniform([1]) *100
+        #v = tf.Variable(0,dtype=tf.dtypes.uint64)
+
+        #random_int = generator.uniform_full_int((), dtype=tf.dtypes.int32)
+        #tf.image.random_crop(image, size=[cags.H, cags.W, 3 ] ,seed= random_int ) 
+        #tf.raw_ops.StatefulUniformFullInt(resource=v, algorithm=[1], shape=[1], dtype=tf.dtypes.uint64, name=None)
+        #v = tf.Variable(random_int, dtype=tf.int64)
+        #tf.random.uniform(shape=(), minval=1, maxval=5, dtype=tf.int32)
+        offset_h = generator.uniform([], maxval=tf.shape(image)[0] - cags.H + 1, dtype=tf.int32)
+        offset_w = generator.uniform([], maxval=tf.shape(image)[1] - cags.W + 1, dtype=tf.int32)
+
+        image = tf.image.crop_to_bounding_box(image, target_height=cags.H, target_width=cags.W, offset_height=offset_h, offset_width=offset_w)
+        mask = tf.image.crop_to_bounding_box(mask, target_height=cags.H, target_width=cags.W, offset_height=offset_h, offset_width=offset_w)
+
+        return (image, mask)
+
+
+    train = cags.train
+    
+    train = train.map(augment_take_mask).take(-1).map( augment_bigger , num_parallel_calls=10 ).cache()
+    train = train.shuffle(l).map(augment_flip).map(augment_crop).batch(args.batch_size).prefetch(buffer_size=tf.data.AUTOTUNE)
+
+
+    #train = cags.train.map(lambda example: (example["image"], example["mask"])).take(-1).cache()
+    #train = train.batch(args.batch_size,drop_remainder=True)
 
     dev = cags.dev.map(lambda example: (
         example["image"], example["mask"])).take(-1).cache()
@@ -102,30 +174,114 @@ def main(args):
         include_top=False)
 
     efficientnet_b0.trainable = False
-
-    #x = keras.layers.Conv2D(512, 3, padding='same', activation='relu')(efficientnet_b0.output[1])
-
-    x = tf.keras.layers.Conv2DTranspose(256, 3, strides=2, padding='same', activation='relu')(efficientnet_b0.output[1])
+    
+    x = tf.keras.layers.Conv2DTranspose(256, 2, strides=2, padding='same', activation='relu')(efficientnet_b0.output[1])
     x = keras.layers.Concatenate()([x, efficientnet_b0.output[2]])
-    
-    x = tf.keras.layers.Conv2DTranspose(128, 3, strides=2, padding='same', activation='relu')(x)
+    x = keras.layers.Convolution2D(256, 3, padding='same')(x)
+
+    x = tf.keras.layers.Conv2DTranspose(256, 2, strides=2, padding='same', activation='relu')(x)
     x = keras.layers.Concatenate()([x, efficientnet_b0.output[3]])
+    x = keras.layers.Convolution2D(256, 3, padding='same')(x)
     
 
-    x = tf.keras.layers.Conv2DTranspose(128, 3, strides=2, padding='same', activation='relu')(x)
+    x = tf.keras.layers.Conv2DTranspose(128, 2, strides=2, padding='same', activation='relu')(x)
     x = keras.layers.Concatenate()([x, efficientnet_b0.output[4]])
+    x = keras.layers.Convolution2D(256, 3, padding='same')(x)
     
 
-    x = tf.keras.layers.Conv2DTranspose(128, 3, strides=2, padding='same', activation='relu')(x)
+    x = tf.keras.layers.Conv2DTranspose(128, 2, strides=2, padding='same', activation='relu')(x)
     x = keras.layers.Concatenate()([x, efficientnet_b0.output[5]])
     
 
-    x = tf.keras.layers.Conv2DTranspose(128, 3, strides=2, padding='same', activation='relu')(x)
+    x = tf.keras.layers.Conv2DTranspose(128, 2, strides=2, padding='same', activation='relu')(x)
+    x = keras.layers.Convolution2D(128, 3, padding='same')(x)
+    x = keras.layers.Convolution2D(128, 3, padding='same')(x)
+
     x = keras.layers.Convolution2D(1, 3, padding='same')(x)
-    x = keras.activations.sigmoid(x)
+    x = keras.layers.Activation('sigmoid', dtype='float32')(x)
 
     # TODO: Create the model and train it
     model = Model(inputs=[efficientnet_b0.input], outputs=[x])
+
+
+    '''
+    dropout_rate = 0.5
+    input_size = (512, 512, 1)
+
+    # If you want to know more about why we are using `he_normal`:
+    # https://stats.stackexchange.com/questions/319323/whats-the-difference-between-variance-scaling-initializer-and-xavier-initialize/319849#319849  
+    # Or the excellent fastai course:
+    # https://github.com/fastai/course-v3/blob/master/nbs/dl2/02b_initializing.ipynb
+    initializer = 'he_normal'
+
+
+    # -- Encoder -- #
+    # Block encoder 1
+    from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, concatenate, UpSampling2D
+    inputs = Input(shape=input_size)
+    conv_enc_1 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer=initializer)(inputs)
+    conv_enc_1 = Conv2D(64, 3, activation = 'relu', padding='same', kernel_initializer=initializer)(conv_enc_1)
+
+    # Block encoder 2
+    max_pool_enc_2 = MaxPooling2D(pool_size=(2, 2))(conv_enc_1)
+    conv_enc_2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(max_pool_enc_2)
+    conv_enc_2 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv_enc_2)
+
+    # Block  encoder 3
+    max_pool_enc_3 = MaxPooling2D(pool_size=(2, 2))(conv_enc_2)
+    conv_enc_3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(max_pool_enc_3)
+    conv_enc_3 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv_enc_3)
+
+    # Block  encoder 4
+    max_pool_enc_4 = MaxPooling2D(pool_size=(2, 2))(conv_enc_3)
+    conv_enc_4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(max_pool_enc_4)
+    conv_enc_4 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv_enc_4)
+    # -- Encoder -- #
+
+    # ----------- #
+    maxpool = MaxPooling2D(pool_size=(2, 2))(conv_enc_4)
+    conv = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(maxpool)
+    conv = Conv2D(1024, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv)
+    # ----------- #
+
+    # -- Decoder -- #
+    # Block decoder 1
+    up_dec_1 = Conv2D(512, 2, activation = 'relu', padding = 'same', kernel_initializer = initializer)(UpSampling2D(size = (2,2))(conv))
+    merge_dec_1 = concatenate([conv_enc_4, up_dec_1], axis = 3)
+    conv_dec_1 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(merge_dec_1)
+    conv_dec_1 = Conv2D(512, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv_dec_1)
+
+    # Block decoder 2
+    up_dec_2 = Conv2D(256, 2, activation = 'relu', padding = 'same', kernel_initializer = initializer)(UpSampling2D(size = (2,2))(conv_dec_1))
+    merge_dec_2 = concatenate([conv_enc_3, up_dec_2], axis = 3)
+    conv_dec_2 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(merge_dec_2)
+    conv_dec_2 = Conv2D(256, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv_dec_2)
+
+    # Block decoder 3
+    up_dec_3 = Conv2D(128, 2, activation = 'relu', padding = 'same', kernel_initializer = initializer)(UpSampling2D(size = (2,2))(conv_dec_2))
+    merge_dec_3 = concatenate([conv_enc_2, up_dec_3], axis = 3)
+    conv_dec_3 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(merge_dec_3)
+    conv_dec_3 = Conv2D(128, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv_dec_3)
+
+    # Block decoder 4
+    up_dec_4 = Conv2D(64, 2, activation = 'relu', padding = 'same', kernel_initializer = initializer)(UpSampling2D(size = (2,2))(conv_dec_3))
+    merge_dec_4 = concatenate([conv_enc_1, up_dec_4], axis = 3)
+    conv_dec_4 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(merge_dec_4)
+    conv_dec_4 = Conv2D(64, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv_dec_4)
+    conv_dec_4 = Conv2D(2, 3, activation = 'relu', padding = 'same', kernel_initializer = initializer)(conv_dec_4)
+    # -- Dencoder -- #
+
+    output = Conv2D(1, 1, activation = 'softmax')(conv_dec_4)
+
+    '''
+
+
+
+
+
+
+
+
     print(model.summary())
     def save():
         # Generate test set annotations, but in args.logdir to allow parallel execution.
@@ -178,6 +334,11 @@ def main(args):
     def IOU_calc_loss(y_true, y_pred):
         return -IOU_calc(y_true, y_pred)
 
+    class LRCallback(Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            print(self.model.optimizer._decayed_lr(np.float32))
+
+
     decay_steps = args.epochs * l / args.batch_size
     lr_decayed_fn = keras.experimental.CosineDecay( args.learning_rate, decay_steps, alpha=0.00001)
 
@@ -185,7 +346,8 @@ def main(args):
 
     globalIoULoss = tfa.losses.SigmoidFocalCrossEntropy(      )
 
-    model.compile(optimizer=tf.keras.optimizers.Adam(lr_decayed_fn),
+    adam = tf.keras.optimizers.Adam(lr_decayed_fn)
+    model.compile(optimizer=adam,
                   loss=globalIoULoss,
                   metrics=[keras.metrics.BinaryAccuracy(), cags.MaskIoUMetric()]
                   )
@@ -207,20 +369,23 @@ def main(args):
     if args.use_lrplatau:
         callback.append(reduce)
 
-    model.fit(train, validation_data=dev, epochs=args.epochs)
-    '''
-    fine_tune_at = 150
+
+    model.fit(train, validation_data=dev, epochs=args.epochs//2, callbacks=[LRCallback()])
+
+    fine_tune_at = 0
     for layer in model.layers[fine_tune_at:]:
         layer.trainable = True
 
-    model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True),
-                  loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-                  metrics=[tf.keras.metrics.Accuracy(), meanIoUMetric() ]
+    print(K.eval(model.optimizer.lr))
+
+    model.compile(optimizer=model.optimizer,
+                  loss=globalIoULoss,
+                  metrics=[keras.metrics.BinaryAccuracy(), cags.MaskIoUMetric()]
                   )
 
-    model.fit(train, validation_data=dev,
-              epochs=args.epochs, callbacks=callback)
-    '''
+    model.fit(train, validation_data=dev, epochs=args.epochs//2, callbacks=[LRCallback()])
+
+    
     save()
 
 
