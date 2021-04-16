@@ -85,9 +85,9 @@ def main(args):
         include_top=False)
 
     x = tf.keras.layers.Dense(1000, activation='relu')(
-        efficientnet_b0.output[5])
+        efficientnet_b0.output[1])
     x = tf.keras.layers.Conv2DTranspose(
-        1, 3, strides=2, padding='same', activation='sigmoid')(x)
+        2, 3, strides=2, padding='same')(x)
     #x = tf.keras.layers.Dense(cags.H * cags.W * 1, activation='sigmoid')(x)
     #x = tf.keras.layers.Reshape([cags.H, cags.W, 1])(x)
 
@@ -112,7 +112,8 @@ def main(args):
         reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True),
-                  loss='mse',
+                  loss=tf.keras.losses.SparseCategoricalCrossentropy(
+                      from_logits=True),
                   metrics=[tf.keras.metrics.Accuracy(), meanIoUMetric]
                   )
 
@@ -141,7 +142,8 @@ def main(args):
         layer.trainable = True
 
     model.compile(optimizer=tf.keras.optimizers.SGD(lr_decayed_fn, momentum=0.9, nesterov=True),
-                  loss='mse',
+                  loss=tf.keras.losses.SparseCategoricalCrossentropy(
+                      from_logits=True),
                   metrics=[tf.keras.metrics.Accuracy(), meanIoUMetric]
                   )
 
