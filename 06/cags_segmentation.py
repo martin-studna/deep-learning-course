@@ -37,7 +37,7 @@ if use_neptune:
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=6, type=int,
+parser.add_argument("--epochs", default=20, type=int,
                     help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
@@ -106,7 +106,13 @@ def main(args):
 
     @tf.function
     def augment_take_mask(data):        
-        return ( data['image'], data['mask'])
+        return ( data['image'], tf.one_hot( data['mask'],2)  )
+
+    @tf.function
+    def augment_onehot(image, mask):      
+        oh = tf.one_hot(  tf.cast(mask*2, dtype=tf.uint8 ) ,2)
+        return ( image, tf.reshape(  oh, (224,224,2)  )  )
+
 
     @tf.function
     def augment_bigger(image, mask):  
@@ -145,12 +151,31 @@ def main(args):
 
         return (image, mask)
 
+    def dataset_to_numpy(dset, test= False):
+        a = list(dset.map(augment_take_mask).take(-1))
+        xka = []
+        yka = []
+        for i in range(len(a)):
+            xka.append(a[i][0])
+            if not test:
+                yka.append(a[i][1])
+        nxka = np.array(xka)
+        if not test:
+            nyka = keras.utils.to_categorical(  np.array(yka) ,2 )
+            return nxka, nyka
+        else:
+            return nxka
 
-    train = cags.train
-    
-    train = train.map(augment_take_mask).take(-1).map( augment_bigger , num_parallel_calls=10 ).cache()
-    train = train.shuffle(l).map(augment_flip).map(augment_crop).batch(args.batch_size).prefetch(buffer_size=tf.data.AUTOTUNE)
+    train_x. train_y = dataset_to_numpy( cags.train )
+    dev_x, dev_y = dataset_to_numpy( cags.dev )
+    test_x = dataset_to_numpy( cags.test, True )
 
+    train = tf.data.Dataset.from_tensor_slices(nxka,nyka)
+    '''
+    train = cags.train.map(augment_take_mask)
+    train = train.map( augment_bigger , num_parallel_calls=10 ).cache()
+    train = train.shuffle(100).map(augment_flip).map(augment_crop).batch(args.batch_size).prefetch(buffer_size=tf.data.AUTOTUNE)
+    '''
 
     #train = cags.train.map(lambda example: (example["image"], example["mask"])).take(-1).cache()
     #train = train.batch(args.batch_size,drop_remainder=True)
@@ -197,8 +222,8 @@ def main(args):
     x = keras.layers.Convolution2D(128, 3, padding='same')(x)
     x = keras.layers.Convolution2D(128, 3, padding='same')(x)
 
-    x = keras.layers.Convolution2D(1, 3, padding='same')(x)
-    x = keras.layers.Activation('sigmoid', dtype='float32')(x)
+    x = keras.layers.Convolution2D(2, 3, padding='same')(x)
+    x = keras.layers.Activation('softmax')(x)
 
     # TODO: Create the model and train it
     model = Model(inputs=[efficientnet_b0.input], outputs=[x])
@@ -283,11 +308,12 @@ def main(args):
 
 
     print(model.summary())
+
     def save():
         # Generate test set annotations, but in args.logdir to allow parallel execution.
         with open("cags_segmentation.txt", "w", encoding="utf-8") as predictions_file:
             # TODO: Predict the masks on the test set
-            test_masks = model.predict(test)
+            test_masks = model.predict(test_x).argmax(axis=3)
 
             for mask in test_masks:
                 zeros, ones, runs = 0, 0, []
@@ -321,6 +347,18 @@ def main(args):
         cv2.imshow("output", p1[0].reshape((224,224)))
         cv2.waitKey(0)
 
+    def shownp(i):
+        import cv2
+        
+        p1 = model.predict( np.array( [test_x[i]] )   )
+
+        cv2.namedWindow('input', cv2.WINDOW_NORMAL)
+        cv2.imshow("input", test_x[i])
+
+        cv2.namedWindow('output', cv2.WINDOW_NORMAL)
+        cv2.imshow("output", p1[0].argmax(axis=2).astype(np.float32).reshape((224,224)))
+        cv2.waitKey(0)
+
     from tensorflow.keras import backend as K
     smooth = 0.1
     def IOU_calc(y_true, y_pred):
@@ -348,8 +386,8 @@ def main(args):
 
     adam = tf.keras.optimizers.Adam(lr_decayed_fn)
     model.compile(optimizer=adam,
-                  loss=globalIoULoss,
-                  metrics=[keras.metrics.BinaryAccuracy(), cags.MaskIoUMetric()]
+                  loss=keras.losses.CategoricalCrossentropy(),
+                  metrics=[keras.metrics.CategoricalAccuracy(), cags.MaskIoUMetric()]
                   )
 
     from tensorflow.keras.callbacks import ReduceLROnPlateau
@@ -369,8 +407,9 @@ def main(args):
     if args.use_lrplatau:
         callback.append(reduce)
 
+    model.fit(nxka, nyka, batch_size=args.batch_size, epochs=args.epochs//2, callbacks=[LRCallback()])
 
-    model.fit(train, validation_data=dev, epochs=args.epochs//2, callbacks=[LRCallback()])
+    #model.fit(train, validation_data=dev, epochs=args.epochs//2, callbacks=[LRCallback()])
 
     fine_tune_at = 0
     for layer in model.layers[fine_tune_at:]:
@@ -379,11 +418,12 @@ def main(args):
     print(K.eval(model.optimizer.lr))
 
     model.compile(optimizer=model.optimizer,
-                  loss=globalIoULoss,
-                  metrics=[keras.metrics.BinaryAccuracy(), cags.MaskIoUMetric()]
+                  loss=keras.losses.CategoricalCrossentropy(),
+                  metrics=[keras.metrics.CategoricalAccuracy(), cags.MaskIoUMetric()]
                   )
 
-    model.fit(train, validation_data=dev, epochs=args.epochs//2, callbacks=[LRCallback()])
+    model.fit(nxka, nyka, batch_size=args.batch_size, epochs=args.epochs//2, callbacks=[LRCallback()])
+    #model.fit(nxka, nyka, batch_size=args.batch_size, epochs=args.epochs//2, callbacks=[LRCallback()])
 
     
     save()
