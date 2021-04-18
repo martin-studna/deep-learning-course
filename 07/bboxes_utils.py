@@ -7,6 +7,9 @@ BACKEND = np  # or you can use `tf` for TensorFlow implementation
 TOP, LEFT, BOTTOM, RIGHT = range(4)
 
 
+CONSTANT = 0.000000000001
+
+
 def bboxes_area(bboxes):
     """ Compute area of given set of bboxes.
 
@@ -60,8 +63,24 @@ def bboxes_to_fast_rcnn(anchors, bboxes):
     the output shape is [anchors_len, 4].
     """
 
-    # TODO: Implement according to the docstring.
-    raise NotImplementedError()
+    result = np.zeros(bboxes.shape)
+
+    for a, b, i in zip(anchors, bboxes, range(len(bboxes))):
+        bbox_y_center = (b[BOTTOM] + b[TOP]) / 2
+        bbox_x_center = (b[LEFT] + b[RIGHT]) / 2
+        anchor_y_center = (a[BOTTOM] + a[TOP]) / 2
+        anchor_x_center = (a[LEFT] + a[RIGHT]) / 2
+
+        result[i][TOP] = (bbox_y_center - anchor_y_center) / \
+            abs(a[TOP] - a[BOTTOM])
+        result[i][LEFT] = (bbox_x_center - anchor_x_center) / \
+            abs(a[LEFT] - a[RIGHT])
+        result[i][BOTTOM] = np.log(
+            abs(b[TOP] - b[BOTTOM]) / abs(a[TOP] - a[BOTTOM]) + CONSTANT)
+        result[i][RIGHT] = np.log(
+            abs(b[LEFT] - b[RIGHT]) / abs(a[LEFT] - a[RIGHT]) + CONSTANT)
+
+    return result
 
 
 def bboxes_from_fast_rcnn(anchors, fast_rcnns):
@@ -71,8 +90,19 @@ def bboxes_from_fast_rcnn(anchors, fast_rcnns):
     the output shape is [anchors_len, 4].
     """
 
+    result = np.zeros(fast_rcnns.shape)
+
+    for a, f, i in zip(anchors, fast_rcnns, range(len(fast_rcnns))):
+        anchor_y_center = (a[BOTTOM] + a[TOP]) / 2
+        anchor_x_center = (a[LEFT] + a[RIGHT]) / 2
+
+        result[i][TOP] = f[TOP] * abs(a[TOP] - a[BOTTOM]) + anchor_y_center
+        result[i][LEFT] = f[LEFT] * abs(a[LEFT] - a[RIGHT]) + anchor_x_center
+        result[i][BOTTOM] = abs(a[TOP] - a[BOTTOM]) * np.exp(f[BOTTOM])
+        result[i][RIGHT] = abs(a[LEFT] - a[RIGHT]) * np.exp(f[RIGHT])
+
     # TODO: Implement according to the docstring.
-    raise NotImplementedError()
+    return result
 
 
 def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
