@@ -96,10 +96,15 @@ def bboxes_from_fast_rcnn(anchors, fast_rcnns):
         anchor_y_center = (a[BOTTOM] + a[TOP]) / 2
         anchor_x_center = (a[LEFT] + a[RIGHT]) / 2
 
-        result[i][TOP] = f[TOP] * abs(a[TOP] - a[BOTTOM]) + anchor_y_center
-        result[i][LEFT] = f[LEFT] * abs(a[LEFT] - a[RIGHT]) + anchor_x_center
-        result[i][BOTTOM] = abs(a[TOP] - a[BOTTOM]) * np.exp(f[BOTTOM])
-        result[i][RIGHT] = abs(a[LEFT] - a[RIGHT]) * np.exp(f[RIGHT])
+        bbox_y_center = f[TOP] * (abs(a[TOP] - a[BOTTOM]) + anchor_y_center)
+        bbox_x_center = f[LEFT] * (abs(a[LEFT] - a[RIGHT]) + anchor_x_center)
+        bbox_height = abs(a[TOP] - a[BOTTOM]) * np.exp(f[BOTTOM])
+        bbox_width = abs(a[LEFT] - a[RIGHT]) * np.exp(f[RIGHT])
+
+        result[i][TOP] = bbox_y_center - bbox_height / 2
+        result[i][LEFT] = bbox_x_center - bbox_width / 2
+        result[i][BOTTOM] = bbox_y_center + bbox_height / 2
+        result[i][RIGHT] = bbox_x_center + bbox_width / 2
 
     # TODO: Implement according to the docstring.
     return result
@@ -188,7 +193,7 @@ class Tests(unittest.TestCase):
 
     def test_bboxes_training(self):
         anchors = np.array([[0, 0, 10, 10], [0, 10, 10, 20], [
-                           10, 0, 20, 10], [10, 10, 20, 20]], np.float32)
+            10, 0, 20, 10], [10, 10, 20, 20]], np.float32)
         for gold_classes, gold_bboxes, anchor_classes, anchor_bboxes, iou in [
                 [[1], [[14., 14, 16, 16]], [0, 0, 0, 2], [[0, 0, 0, 0]]
                     * 3 + [[0, 0, np.log(1/5), np.log(1/5)]], 0.5],
