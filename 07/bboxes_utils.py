@@ -96,8 +96,8 @@ def bboxes_from_fast_rcnn(anchors, fast_rcnns):
         anchor_y_center = (a[BOTTOM] + a[TOP]) / 2
         anchor_x_center = (a[LEFT] + a[RIGHT]) / 2
 
-        bbox_y_center = f[TOP] * (abs(a[TOP] - a[BOTTOM]) + anchor_y_center)
-        bbox_x_center = f[LEFT] * (abs(a[LEFT] - a[RIGHT]) + anchor_x_center)
+        bbox_y_center = f[TOP] * abs(a[TOP] - a[BOTTOM]) + anchor_y_center
+        bbox_x_center = f[LEFT] * abs(a[LEFT] - a[RIGHT]) + anchor_x_center
         bbox_height = abs(a[TOP] - a[BOTTOM]) * np.exp(f[BOTTOM])
         bbox_width = abs(a[LEFT] - a[RIGHT]) * np.exp(f[RIGHT])
 
