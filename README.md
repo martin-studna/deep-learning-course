@@ -31,7 +31,7 @@
   <h3 align="center">Deep Learning Course Homeworks</h3>
 
   <p align="center">
-    This repository holds solution to assignments from Deep Learning course
+    This repository holds solution to the assignments from the Deep Learning course
     <br />
     <!-- <a href="https://github.com/othneildrew/Best-README-Template"><strong>Explore the docs »</strong></a> -->
     <br />
