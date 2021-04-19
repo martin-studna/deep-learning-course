@@ -412,7 +412,7 @@ def main(args):
     if args.use_lrplatau:
         callback.append(reduce)
 
-    model.fit(train, batch_size=args.batch_size, epochs=args.epochs//2, callbacks=[LRCallback()])
+    model.fit(train, epochs=args.epochs//2, callbacks=[LRCallback()])
 
     #model.fit(train, validation_data=dev, epochs=args.epochs//2, callbacks=[LRCallback()])
 
@@ -427,7 +427,7 @@ def main(args):
                   metrics=[keras.metrics.CategoricalAccuracy(), cags.MaskIoUMetric()]
                   )
 
-    model.fit(nxka, nyka, batch_size=args.batch_size, epochs=args.epochs//2, callbacks=[LRCallback()])
+    model.fit(train, epochs=args.epochs//2, callbacks=[LRCallback()])
     #model.fit(nxka, nyka, batch_size=args.batch_size, epochs=args.epochs//2, callbacks=[LRCallback()])
 
     
