@@ -103,10 +103,10 @@ def main(args):
             lr_schedule = tf.keras.optimizers.schedules.PolynomialDecay(
                 args.learning_rate, mnist.train.size / args.batch_size, end_learning_rate=args.learning_rate_final)
         elif args.decay == "exponential":
-            pocet_kroku = mnist.train.size / args.batch_size * args.epochs
+            steps_count = mnist.train.size / args.batch_size * args.epochs
 
             lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-                args.learning_rate, pocet_kroku,args.learning_rate_final /args.learning_rate)
+                args.learning_rate, steps_count, args.learning_rate_final / args.learning_rate)
 
     optimizer = None
 
@@ -136,9 +136,12 @@ def main(args):
     # Ugly hack allowing to log also test data metrics.
     tb_callback._close_writers = lambda: None
 
-    mnist.train.data["labels"] = tf.keras.utils.to_categorical(mnist.train.data["labels"])
-    mnist.dev.data["labels"] = tf.keras.utils.to_categorical(mnist.dev.data["labels"])
-    mnist.test.data["labels"] = tf.keras.utils.to_categorical(mnist.test.data["labels"])
+    mnist.train.data["labels"] = tf.keras.utils.to_categorical(
+        mnist.train.data["labels"])
+    mnist.dev.data["labels"] = tf.keras.utils.to_categorical(
+        mnist.dev.data["labels"])
+    mnist.test.data["labels"] = tf.keras.utils.to_categorical(
+        mnist.test.data["labels"])
 
     model.fit(
         mnist.train.data["images"], mnist.train.data["labels"],
