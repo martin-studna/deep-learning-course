@@ -170,7 +170,7 @@ def main(args):
     dev_x, dev_y = dataset_to_numpy( cags.dev )
     test_x = dataset_to_numpy( cags.test, True )
 
-    train = tf.data.Dataset.from_tensor_slices((train_x,train_y))
+    train = tf.data.Dataset.from_tensor_slices((train_x,train_y)).batch(args.batch_size)
     '''
     train = cags.train.map(augment_take_mask)
     train = train.map( augment_bigger , num_parallel_calls=10 ).cache()
@@ -412,7 +412,7 @@ def main(args):
     if args.use_lrplatau:
         callback.append(reduce)
 
-    model.fit(nxka, nyka, batch_size=args.batch_size, epochs=args.epochs//2, callbacks=[LRCallback()])
+    model.fit(train, batch_size=args.batch_size, epochs=args.epochs//2, callbacks=[LRCallback()])
 
     #model.fit(train, validation_data=dev, epochs=args.epochs//2, callbacks=[LRCallback()])
 
