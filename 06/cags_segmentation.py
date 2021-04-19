@@ -37,7 +37,7 @@ if use_neptune:
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=20, type=int,
+parser.add_argument("--epochs", default=10, type=int,
                     help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
@@ -106,7 +106,7 @@ def main(args):
 
     @tf.function
     def augment_take_mask(data):        
-        return ( data['image'], tf.one_hot( data['mask'],2)  )
+        return ( data['image'], data['mask'] )
 
     @tf.function
     def augment_onehot(image, mask):      
@@ -166,11 +166,11 @@ def main(args):
         else:
             return nxka
 
-    train_x. train_y = dataset_to_numpy( cags.train )
+    train_x, train_y = dataset_to_numpy( cags.train )
     dev_x, dev_y = dataset_to_numpy( cags.dev )
     test_x = dataset_to_numpy( cags.test, True )
 
-    train = tf.data.Dataset.from_tensor_slices(nxka,nyka)
+    train = tf.data.Dataset.from_tensor_slices((train_x,train_y))
     '''
     train = cags.train.map(augment_take_mask)
     train = train.map( augment_bigger , num_parallel_calls=10 ).cache()
@@ -347,6 +347,10 @@ def main(args):
         cv2.imshow("output", p1[0].reshape((224,224)))
         cv2.waitKey(0)
 
+    def show10():
+        for i in range(10):
+            shownp(i)
+
     def shownp(i):
         import cv2
         
@@ -389,7 +393,8 @@ def main(args):
                   loss=keras.losses.CategoricalCrossentropy(),
                   metrics=[keras.metrics.CategoricalAccuracy(), cags.MaskIoUMetric()]
                   )
-
+    #shownp(0)
+    
     from tensorflow.keras.callbacks import ReduceLROnPlateau
 
     reduce = ReduceLROnPlateau(
