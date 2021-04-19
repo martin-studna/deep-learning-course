@@ -137,3 +137,6 @@ logs
 03/uppercase_data.zip
 uppercase_data.zip
 03/.vs/
+*.tfrecord
+*.h5
+05/.vscode/
