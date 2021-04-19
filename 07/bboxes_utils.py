@@ -144,6 +144,8 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     # several gold objects are assigned to a single anchor, use the gold object
     # with smaller index.
 
+    
+
     # TODO: For each unused anchors, find the gold object with the largest IoU
     # (again the one with smaller index if there are several), and if the IoU
     # is >= threshold, assign the object to the anchor.
