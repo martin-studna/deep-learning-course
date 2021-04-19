@@ -4,16 +4,16 @@ ssh alifuk@skirit.ics.muni.cz
 qsub -l walltime=1:0:0 -q gpu@cerit-pbs.cerit-sc.cz -l select=1:ncpus=1:ngpus=1:mem=20000mb:scratch_local=4000mb:gpu_cap=cuda80 -I
 
 ls /cvmfs/singularity.metacentrum.cz
-singularity shell --nv /cvmfs/singularity.metacentrum.cz/NGC/TensorFlow\:21.02-tf2-py3.SIF
+singularity shell --nv /cvmfs/singularity.metacentrum.cz/NGC/TensorFlow\:21.02-tf2-py3.SIF  -B $SCRATCHDIR
 
 git clone https://github.com/martin-studna/deep-learning-course.git
-cd deep-learning-course/03
-git checkout albert_week3
+cd deep-learning-course/04
+git checkout week_4
 
 pip3 install neptune-client
 
 
-python3 uppercase.py
+python3 cifar_competition.py
 
 
 

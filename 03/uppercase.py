@@ -1,5 +1,4 @@
-
-
+#!/usr/bin/env python3
 from uppercase_data import UppercaseData
 import tensorflow as tf
 import numpy as np
@@ -97,7 +96,7 @@ PARAMS = {
 
 # 13 epoch
 model.fit(uppercase_data.train.data["windows"], labels, batch_size=batch_size, shuffle=True,
-          validation_data=(uppercase_data.dev.data["windows"], labels_dev), epochs=epochs)
+          validation_data=(uppercase_data.dev.data["windows"], labels_dev), epochs=epochs, callbacks=[CustomCallback()])
 
 
 predictions = model.predict(uppercase_data.test.data["windows"])

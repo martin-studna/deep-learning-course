@@ -75,11 +75,13 @@ class Network(tf.keras.Model):
         i1 = klas_vrstva(img1)
         i2 = klas_vrstva(img2)
 
+        
+
         outputs = {
             "direct_prediction": dp,
             "digit_1": i1,
             "digit_2": i2,
-            "indirect_prediction": tf.argmax(i1, axis=1) > tf.argmax(i2, axis=1),
+            "indirect_prediction": tf.argmax(i1, axis=1) > tf.argmax(i2, axis=1) ,
         }
 
         # Finally, construct the model.
@@ -133,8 +135,8 @@ class Network(tf.keras.Model):
 
         def create_element(images, labels):
             return ((images[0], images[1]), {'digit_1': labels[0],
-                                             'digit_2': labels[1],
-                                             'direct_prediction': tf.cast(labels[0] > labels[1], dtype=tf.float32), 'indirect_prediction': labels[0] > labels[1]})
+             'digit_2': labels[1], 
+             'direct_prediction': tf.cast(labels[0]>labels[1], dtype=tf.float32), 'indirect_prediction': labels[0]>labels[1]})
         dataset = dataset.map(create_element)
 
         # TODO: Create batches of size `args.batch_size`
