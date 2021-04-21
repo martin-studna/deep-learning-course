@@ -37,9 +37,9 @@ if use_neptune:
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=10, type=int,
+parser.add_argument("--epochs", default=20, type=int,
                     help="Number of epochs.")
-parser.add_argument("--seed", default=42, type=int, help="Random seed.")
+parser.add_argument("--seed", default=44, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
                     help="Maximum number of threads to use.")
 parser.add_argument("--learning_rate", default=0.001,
@@ -96,7 +96,6 @@ def main(args):
     # Load the data
     cags = CAGS()
     l = 2142
-
     '''
     train = cags.train.map(lambda example: (example["image"], example["mask"])).batch(
         args.batch_size).take(-1).cache()
@@ -310,10 +309,14 @@ def main(args):
     print(model.summary())
 
     def save():
+        m1 = keras.models.load_model('20epo_with.h5', custom_objects={'MaskIoUMetric':cags.MaskIoUMetric})
+        m2 = keras.models.load_model('20epo_with2.h5', custom_objects={'MaskIoUMetric':cags.MaskIoUMetric})
+        m3 = keras.models.load_model('20epo_without.h5', custom_objects={'MaskIoUMetric':cags.MaskIoUMetric})
         # Generate test set annotations, but in args.logdir to allow parallel execution.
         with open("cags_segmentation.txt", "w", encoding="utf-8") as predictions_file:
             # TODO: Predict the masks on the test set
-            test_masks = model.predict(test_x).argmax(axis=3)
+            #test_masks = m1.predict(test_x, batch_size=4).argmax(axis=3).reshape((612,224,224,1))
+            test_masks = (m1.predict(test_x, batch_size=4) + m2.predict(test_x, batch_size=4) + m3.predict(test_x, batch_size=4)).argmax(axis=3).reshape((612,224,224,1))
 
             for mask in test_masks:
                 zeros, ones, runs = 0, 0, []
@@ -330,7 +333,9 @@ def main(args):
                         zeros += 1
                 runs.append(zeros + ones)
                 print(*runs, file=predictions_file)
-                
+    
+    save()
+
     def show():
         a = list( train.take(1) )[0]
         a1 = a[0][0].numpy()
@@ -354,13 +359,18 @@ def main(args):
     def shownp(i):
         import cv2
         
-        p1 = model.predict( np.array( [test_x[i]] )   )
+        p1 = model.predict( np.array( [train_x[i]] )   )
 
         cv2.namedWindow('input', cv2.WINDOW_NORMAL)
-        cv2.imshow("input", test_x[i])
+        cv2.imshow("input", cv2.cvtColor( train_x[i], cv2.COLOR_RGB2BGR   ))
 
         cv2.namedWindow('output', cv2.WINDOW_NORMAL)
         cv2.imshow("output", p1[0].argmax(axis=2).astype(np.float32).reshape((224,224)))
+
+        
+        cv2.namedWindow('mask', cv2.WINDOW_NORMAL)
+        cv2.imshow("mask", (train_y[i].argmax( axis=2)*255).astype(np.uint8) )
+
         cv2.waitKey(0)
 
     from tensorflow.keras import backend as K
