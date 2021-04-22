@@ -110,6 +110,29 @@ def bboxes_from_fast_rcnn(anchors, fast_rcnns):
     return result
 
 
+def box_size(box):
+    return (box.BOTTOM - box.TOP) * (box.RIGHT - box.RIGHT)
+
+
+def box_intersect(b1, b2):
+    result = np.zeros(4)
+
+    result[TOP] = max(b1.TOP, b2.TOP)
+    result[LEFT] = max(b1.LEFT, b2.LEFT)
+    result[RIGHT] = min(b1.RIGHT, b2.RIGHT)
+    result[BOTTOM] = min(b1.BOTTOM, b2.BOTTOM)
+
+    return result
+
+
+def box_IoU(b1, b2):
+    b1_size = box_size(b1)
+    b2_size = box_size(b2)
+    intersect = box_intersect(b1, b2)
+
+    return intersect / (b1_size + b2_size - intersect)
+
+
 def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     """ Compute training data for object detection.
 
@@ -144,12 +167,16 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     # several gold objects are assigned to a single anchor, use the gold object
     # with smaller index.
 
-    def box_size(box):
-        return ( box.BOTTOM - box.TOP ) * ( box.RIGHT - box.RIGHT )
-    
-    
+    anchor_classes = np.array([])
+    anchor_bboxes = np.array([])
 
-    IoUs = np.ones(  )
+    for g in gold_bboxes:
+        largest_IoU = 0
+        matching_anchor = None
+        for a in anchors:
+            if largest_IoU < box_IoU(a, g):
+                largest_IoU = box_IoU(a, g)
+                matching_anchor = a
 
     # TODO: For each unused anchors, find the gold object with the largest IoU
     # (again the one with smaller index if there are several), and if the IoU
@@ -202,12 +229,18 @@ class Tests(unittest.TestCase):
         anchors = np.array([[0, 0, 10, 10], [0, 10, 10, 20], [
             10, 0, 20, 10], [10, 10, 20, 20]], np.float32)
         for gold_classes, gold_bboxes, anchor_classes, anchor_bboxes, iou in [
-                [[1], [[14., 14, 16, 16]], [0, 0, 0, 2], [[0, 0, 0, 0]] * 3 + [[0, 0, np.log(1/5), np.log(1/5)]], 0.5],
-                [[2], [[0., 0, 20, 20]], [3, 0, 0, 0], [  [.5, .5, np.log(2), np.log(2)]] + [[0, 0, 0, 0]] * 3, 0.26],
-                [[2], [[0., 0, 20, 20]], [3, 3, 3, 3], [ [y, x, np.log(2), np.log(2)] for y in [.5, -.5] for x in [.5, -.5]], 0.24],
-                [[0, 1], [[3, 3, 20, 18], [10, 1, 18, 21]], [0, 0, 0, 1],   [[0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [-0.35, -0.45, 0.53062826, 0.4054651]], 0.5],
-                [[0, 1], [[3, 3, 20, 18], [10, 1, 18, 21]], [0, 0, 2, 1], [[0, 0, 0, 0], [0, 0, 0, 0], [-0.1, 0.6, -0.22314353, 0.6931472], [-0.35, -0.45, 0.53062826, 0.4054651]], 0.3],
-                [[0, 1], [[3, 3, 20, 18], [10, 1, 18, 21]], [0, 1, 2, 1], [[0, 0, 0, 0], [0.65, -0.45, 0.53062826, 0.4054651], [-0.1, 0.6, -0.22314353, 0.6931472], [-0.35, -0.45, 0.53062826, 0.4054651]], 0.17],
+                [[1], [[14., 14, 16, 16]], [0, 0, 0, 2], [[0, 0, 0, 0]]
+                    * 3 + [[0, 0, np.log(1/5), np.log(1/5)]], 0.5],
+                [[2], [[0., 0, 20, 20]], [3, 0, 0, 0], [
+                    [.5, .5, np.log(2), np.log(2)]] + [[0, 0, 0, 0]] * 3, 0.26],
+                [[2], [[0., 0, 20, 20]], [3, 3, 3, 3], [
+                    [y, x, np.log(2), np.log(2)] for y in [.5, -.5] for x in [.5, -.5]], 0.24],
+                [[0, 1], [[3, 3, 20, 18], [10, 1, 18, 21]], [0, 0, 0, 1],   [[0, 0, 0, 0], [
+                    0, 0, 0, 0], [0, 0, 0, 0], [-0.35, -0.45, 0.53062826, 0.4054651]], 0.5],
+                [[0, 1], [[3, 3, 20, 18], [10, 1, 18, 21]], [0, 0, 2, 1], [[0, 0, 0, 0], [
+                    0, 0, 0, 0], [-0.1, 0.6, -0.22314353, 0.6931472], [-0.35, -0.45, 0.53062826, 0.4054651]], 0.3],
+                [[0, 1], [[3, 3, 20, 18], [10, 1, 18, 21]], [0, 1, 2, 1], [[0, 0, 0, 0], [0.65, -0.45, 0.53062826,
+                                                                                          0.4054651], [-0.1, 0.6, -0.22314353, 0.6931472], [-0.35, -0.45, 0.53062826, 0.4054651]], 0.17],
         ]:
             gold_classes, anchor_classes = np.array(
                 gold_classes, np.int32), np.array(anchor_classes, np.int32)
