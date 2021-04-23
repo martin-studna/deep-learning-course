@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import unittest
 import numpy as np
+import tensorflow as tf
 
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
@@ -66,24 +67,16 @@ def bboxes_to_fast_rcnn(anchors, bboxes):
     the output shape is [anchors_len, 4].
     """
 
-    result = np.zeros(bboxes.shape)
-
-    for a, b, i in zip(anchors, bboxes, range(len(bboxes))):
-        bbox_y_center = (b[BOTTOM] + b[TOP]) / 2
-        bbox_x_center = (b[LEFT] + b[RIGHT]) / 2
-        anchor_y_center = (a[BOTTOM] + a[TOP]) / 2
-        anchor_x_center = (a[LEFT] + a[RIGHT]) / 2
-
-        result[i][TOP] = (bbox_y_center - anchor_y_center) / \
-            abs(a[TOP] - a[BOTTOM])
-        result[i][LEFT] = (bbox_x_center - anchor_x_center) / \
-            abs(a[LEFT] - a[RIGHT])
-        result[i][BOTTOM] = np.log(
-            abs(b[TOP] - b[BOTTOM]) / abs(a[TOP] - a[BOTTOM]) + CONSTANT)
-        result[i][RIGHT] = np.log(
-            abs(b[LEFT] - b[RIGHT]) / abs(a[LEFT] - a[RIGHT]) + CONSTANT)
-
-    return result
+    return BACKEND.stack([
+        ((bboxes[..., BOTTOM] + bboxes[..., TOP]) / 2 - (anchors[..., BOTTOM] + anchors[..., TOP]) / 2) /
+        abs(anchors[..., TOP] - anchors[..., BOTTOM]),
+        ((bboxes[..., LEFT] + bboxes[..., RIGHT]) / 2 - (anchors[..., LEFT] + anchors[..., RIGHT]) / 2) /
+        abs(anchors[..., LEFT] - anchors[..., RIGHT]),
+        BACKEND.log(
+            abs(bboxes[..., TOP] - bboxes[..., BOTTOM]) / abs(anchors[..., TOP] - anchors[..., BOTTOM]) + CONSTANT),
+        BACKEND.log(
+            abs(bboxes[..., LEFT] - bboxes[..., RIGHT]) / abs(anchors[..., LEFT] - anchors[..., RIGHT]) + CONSTANT)
+    ], axis=-1)
 
 
 def bboxes_from_fast_rcnn(anchors, fast_rcnns):
@@ -92,25 +85,17 @@ def bboxes_from_fast_rcnn(anchors, fast_rcnns):
     The anchors.shape is [anchors_len, 4], fast_rcnns.shape is [anchors_len, 4],
     the output shape is [anchors_len, 4].
     """
-
-    result = np.zeros(fast_rcnns.shape)
-
-    for a, f, i in zip(anchors, fast_rcnns, range(len(fast_rcnns))):
-        anchor_y_center = (a[BOTTOM] + a[TOP]) / 2
-        anchor_x_center = (a[LEFT] + a[RIGHT]) / 2
-
-        bbox_y_center = f[TOP] * abs(a[TOP] - a[BOTTOM]) + anchor_y_center
-        bbox_x_center = f[LEFT] * abs(a[LEFT] - a[RIGHT]) + anchor_x_center
-        bbox_height = abs(a[TOP] - a[BOTTOM]) * np.exp(f[BOTTOM])
-        bbox_width = abs(a[LEFT] - a[RIGHT]) * np.exp(f[RIGHT])
-
-        result[i][TOP] = bbox_y_center - bbox_height / 2
-        result[i][LEFT] = bbox_x_center - bbox_width / 2
-        result[i][BOTTOM] = bbox_y_center + bbox_height / 2
-        result[i][RIGHT] = bbox_x_center + bbox_width / 2
-
     # TODO: Implement according to the docstring.
-    return result
+    return BACKEND.stack([
+        (fast_rcnns[..., TOP] * abs(anchors[..., TOP] - anchors[..., BOTTOM]) + ((anchors[..., BOTTOM] + anchors[...,
+         TOP]) / 2)) - (abs(anchors[..., TOP] - anchors[..., BOTTOM]) * BACKEND.exp(fast_rcnns[..., BOTTOM])) / 2,
+        (fast_rcnns[..., LEFT] * abs(anchors[..., LEFT] - anchors[..., RIGHT]) + ((anchors[..., LEFT] + anchors[...,
+         RIGHT]) / 2)) - (abs(anchors[..., LEFT] - anchors[..., RIGHT]) * BACKEND.exp(fast_rcnns[..., RIGHT])) / 2,
+        (fast_rcnns[..., TOP] * abs(anchors[..., TOP] - anchors[..., BOTTOM]) + ((anchors[..., BOTTOM] + anchors[...,
+                                                                                                                 TOP]) / 2)) + (abs(anchors[..., TOP] - anchors[..., BOTTOM]) * BACKEND.exp(fast_rcnns[..., BOTTOM])) / 2,
+        (fast_rcnns[..., LEFT] * abs(anchors[..., LEFT] - anchors[..., RIGHT]) + ((anchors[..., LEFT] + anchors[...,
+         RIGHT]) / 2)) + (abs(anchors[..., LEFT] - anchors[..., RIGHT]) * BACKEND.exp(fast_rcnns[..., RIGHT])) / 2
+    ], axis=-1)
 
 
 def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
@@ -148,11 +133,11 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     # with smaller index.
 
     # pro anchorum přiřadíme gold_bbox_index
-    anchor_classes = np.zeros((len(anchors)), dtype=np.uint16)
-    anchor_bboxes = np.zeros((len(anchors), 4))
+    anchor_classes = BACKEND.zeros((len(anchors)), dtype=BACKEND.uint16)
+    anchor_bboxes = BACKEND.zeros((len(anchors), 4))
 
-    IOUs = np.zeros((len(anchors), len(gold_bboxes)))
-    IOUs_for_gold = np.zeros((len(gold_bboxes), len(anchors)))
+    IOUs = BACKEND.zeros((len(anchors), len(gold_bboxes)))
+    IOUs_for_gold = BACKEND.zeros((len(gold_bboxes), len(anchors)))
 
     used_anchors = []
 
@@ -177,7 +162,7 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     for i in range(len(anchor_classes)):
         if anchor_classes[i] != 0:
             anchor_bboxes[i] = bboxes_to_fast_rcnn(
-                np.array([anchors[i]]),   np.array([gold_bboxes[anchor_classes[i]-1]]))
+                BACKEND.array([anchors[i]]), BACKEND.array([gold_bboxes[anchor_classes[i]-1]]))
             anchor_classes[i] = gold_classes[anchor_classes[i]-1] + 1
 
     return anchor_classes, anchor_bboxes
