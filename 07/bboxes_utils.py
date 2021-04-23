@@ -113,29 +113,6 @@ def bboxes_from_fast_rcnn(anchors, fast_rcnns):
     return result
 
 
-def box_size(box):
-    return (max(0, box[BOTTOM] - box[TOP])) * (max(0, box[RIGHT] - box[LEFT]))
-
-
-def box_intersect(b1, b2):
-    result = np.zeros(4)
-
-    result[TOP] = max(b1[TOP], b2[TOP])
-    result[LEFT] = max(b1[LEFT], b2[LEFT])
-    result[RIGHT] = min(b1[RIGHT], b2[RIGHT])
-    result[BOTTOM] = min(b1[BOTTOM], b2[BOTTOM])
-
-    return result
-
-
-def box_IoU(b1, b2):
-    b1_size = box_size(b1)
-    b2_size = box_size(b2)
-    intersect = box_size(box_intersect(b1, b2))
-
-    return intersect / (b1_size + b2_size - intersect)
-
-
 def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     """ Compute training data for object detection.
 
@@ -199,7 +176,6 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
 
     for i in range(len(anchor_classes)):
         if anchor_classes[i] != 0:
-            # anchor_bboxes[i] = gold_bboxes[ anchor_classes[i]-1 ] #[0.0, 0.0, -1.609438, -1.609438] má vyjít
             anchor_bboxes[i] = bboxes_to_fast_rcnn(
                 np.array([anchors[i]]),   np.array([gold_bboxes[anchor_classes[i]-1]]))
             anchor_classes[i] = gold_classes[anchor_classes[i]-1] + 1
