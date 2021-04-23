@@ -189,15 +189,13 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
         max_anchor_iou_index = IOUs_for_gold[g].argmax()
         if anchor_classes[max_anchor_iou_index] == 0:
             anchor_classes[max_anchor_iou_index] = 1 + g
-            used_anchors.append(max_anchor_iou_index)
 
     # TODO: For each unused anchors, find the gold object with the largest IoU
     # (again the one with smaller index if there are several), and if the IoU
     # is >= threshold, assign the object to the anchor.
     for a in range(len(anchors)):
-        if a not in used_anchors:
-            if IOUs[a].max() >= iou_threshold and anchor_classes[a] == 0:
-                anchor_classes[a] = 1 + IOUs[a].argmax()
+        if IOUs[a].max() >= iou_threshold and anchor_classes[a] == 0:
+            anchor_classes[a] = 1 + IOUs[a].argmax()
 
     for i in range(len(anchor_classes)):
         if anchor_classes[i] != 0:
