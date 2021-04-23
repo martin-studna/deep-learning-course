@@ -170,8 +170,6 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     anchor_classes = np.zeros( ( len(anchors) ), dtype=np.uint16 ) #pro anchorum přiřadíme gold_bbox_index
     anchor_bboxes = np.zeros( (len(anchors), 4))
 
-    gold_classes = np.zeros(len(gold_bboxes)) 
-
     IOUs = np.zeros( (len(anchors), len(gold_bboxes)) )
     IOUs_for_gold = np.zeros( (len(gold_bboxes) , len(anchors)  ) )
 
@@ -200,8 +198,12 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
                 anchor_classes[a] = 1 + IOUs[a].argmax() 
 
     for i in range(len(anchor_classes)):
-        if anchor_classes[i] == 0:
+        if anchor_classes[i] != 0:
             anchor_bboxes[i] = gold_bboxes[ anchor_classes[i]-1 ]
+
+    for i in range(len(anchor_classes)):
+        if anchor_classes[i] != 0:
+            anchor_classes[i] = gold_classes[ anchor_classes[i]-1 ] +1
 
     return anchor_classes, anchor_bboxes
 
