@@ -199,7 +199,8 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
 
     for i in range(len(anchor_classes)):
         if anchor_classes[i] != 0:
-            anchor_bboxes[i] = gold_bboxes[ anchor_classes[i]-1 ]
+            #anchor_bboxes[i] = gold_bboxes[ anchor_classes[i]-1 ] #[0.0, 0.0, -1.609438, -1.609438] má vyjít
+            anchor_bboxes[i]  = bboxes_to_fast_rcnn(   np.array( [anchors[i]  ])   ,   np.array( [ gold_bboxes[ anchor_classes[i]-1 ]  ])   )
 
     for i in range(len(anchor_classes)):
         if anchor_classes[i] != 0:
