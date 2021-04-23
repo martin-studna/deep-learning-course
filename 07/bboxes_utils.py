@@ -111,16 +111,16 @@ def bboxes_from_fast_rcnn(anchors, fast_rcnns):
 
 
 def box_size(box):
-    return (box.BOTTOM - box.TOP) * (box.RIGHT - box.RIGHT)
+    return ( max(0, box[BOTTOM] - box[TOP] ) ) * ( max(0, box[RIGHT] - box[LEFT] ) )
 
 
 def box_intersect(b1, b2):
     result = np.zeros(4)
 
-    result[TOP] = max(b1.TOP, b2.TOP)
-    result[LEFT] = max(b1.LEFT, b2.LEFT)
-    result[RIGHT] = min(b1.RIGHT, b2.RIGHT)
-    result[BOTTOM] = min(b1.BOTTOM, b2.BOTTOM)
+    result[TOP] = max(b1[TOP], b2[TOP])
+    result[LEFT] = max(b1[LEFT], b2[LEFT])
+    result[RIGHT] = min(b1[RIGHT], b2[RIGHT])
+    result[BOTTOM] = min(b1[BOTTOM], b2[BOTTOM])
 
     return result
 
@@ -128,7 +128,7 @@ def box_intersect(b1, b2):
 def box_IoU(b1, b2):
     b1_size = box_size(b1)
     b2_size = box_size(b2)
-    intersect = box_intersect(b1, b2)
+    intersect = box_size( box_intersect(b1, b2) )
 
     return intersect / (b1_size + b2_size - intersect)
 
@@ -167,20 +167,35 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     # several gold objects are assigned to a single anchor, use the gold object
     # with smaller index.
 
-    anchor_classes = np.array([])
-    anchor_bboxes = np.array([])
+    anchor_classes = np.zeros( ( len(anchors) ), dtype=np.uint16 ) #pro anchorum přiřadíme gold_bbox_index
+    anchor_bboxes = np.zeros( (len(anchors), 4))
 
-    for g in gold_bboxes:
-        largest_IoU = 0
-        matching_anchor = None
-        for a in anchors:
-            if largest_IoU < box_IoU(a, g):
-                largest_IoU = box_IoU(a, g)
-                matching_anchor = a
+    gold_classes = np.zeros(len(gold_bboxes)) 
+
+    IOUs = np.zeros( (len(gold_bboxes), len(anchors)) )
+    IOUs_for_anchors = np.zeros( (len(anchors) , len(gold_bboxes)  ) )
+
+    used_anchors = []
+
+    for g in range(len(gold_bboxes)):
+        for a in range(len(anchors)):
+            IOUs[g, a] = box_IoU(anchors[a], gold_bboxes[g])
+            IOUs_for_anchors[a, g] = box_IoU(anchors[a], gold_bboxes[g])
+        
+        used_anchors.append(IOUs[g].argmax())
+        anchor_classes[g] = 1 + IOUs[g].argmax() #TADY JE CHYBA PŘI PRVNÍM PRŮCHODU, NESMÍ TAM BÝT INDEX 3(4)
 
     # TODO: For each unused anchors, find the gold object with the largest IoU
     # (again the one with smaller index if there are several), and if the IoU
     # is >= threshold, assign the object to the anchor.
+    for a in range(len(anchors)):
+        if anchor_classes[a] not in used_anchors:
+            if IOUs_for_anchors[a].max() > iou_threshold:
+                anchor_classes[g] = 1 + IOUs_for_anchors[a].argmax() 
+
+    for i in range(len(anchor_classes)):
+        if anchor_classes[i] != 0:
+            anchor_bboxes[i] = gold_bboxes[ anchor_classes[i]-1 ]
 
     return anchor_classes, anchor_bboxes
 
@@ -229,8 +244,7 @@ class Tests(unittest.TestCase):
         anchors = np.array([[0, 0, 10, 10], [0, 10, 10, 20], [
             10, 0, 20, 10], [10, 10, 20, 20]], np.float32)
         for gold_classes, gold_bboxes, anchor_classes, anchor_bboxes, iou in [
-                [[1], [[14., 14, 16, 16]], [0, 0, 0, 2], [[0, 0, 0, 0]]
-                    * 3 + [[0, 0, np.log(1/5), np.log(1/5)]], 0.5],
+                [[1], [[14., 14, 16, 16]], [0, 0, 0, 2], [[0, 0, 0, 0]] * 3 + [[0, 0, np.log(1/5), np.log(1/5)]], 0.5],
                 [[2], [[0., 0, 20, 20]], [3, 0, 0, 0], [
                     [.5, .5, np.log(2), np.log(2)]] + [[0, 0, 0, 0]] * 3, 0.26],
                 [[2], [[0., 0, 20, 20]], [3, 3, 3, 3], [
@@ -242,12 +256,9 @@ class Tests(unittest.TestCase):
                 [[0, 1], [[3, 3, 20, 18], [10, 1, 18, 21]], [0, 1, 2, 1], [[0, 0, 0, 0], [0.65, -0.45, 0.53062826,
                                                                                           0.4054651], [-0.1, 0.6, -0.22314353, 0.6931472], [-0.35, -0.45, 0.53062826, 0.4054651]], 0.17],
         ]:
-            gold_classes, anchor_classes = np.array(
-                gold_classes, np.int32), np.array(anchor_classes, np.int32)
-            gold_bboxes, anchor_bboxes = np.array(
-                gold_bboxes, np.float32), np.array(anchor_bboxes, np.float32)
-            computed_classes, computed_bboxes = bboxes_training(
-                anchors, gold_classes, gold_bboxes, iou)
+            gold_classes, anchor_classes = np.array( gold_classes, np.int32), np.array(anchor_classes, np.int32)
+            gold_bboxes, anchor_bboxes = np.array(  gold_bboxes, np.float32), np.array(anchor_bboxes, np.float32)
+            computed_classes, computed_bboxes = bboxes_training(  anchors, gold_classes, gold_bboxes, iou)
             np.testing.assert_almost_equal(
                 computed_classes, anchor_classes, decimal=3)
             np.testing.assert_almost_equal(
