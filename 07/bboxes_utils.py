@@ -172,29 +172,35 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
 
     gold_classes = np.zeros(len(gold_bboxes)) 
 
-    IOUs = np.zeros( (len(gold_bboxes), len(anchors)) )
-    IOUs_for_anchors = np.zeros( (len(anchors) , len(gold_bboxes)  ) )
+    IOUs = np.zeros( (len(anchors), len(gold_bboxes)) )
+    IOUs_for_gold = np.zeros( (len(gold_bboxes) , len(anchors)  ) )
 
     used_anchors = []
 
-    for g in range(len(gold_bboxes)):
-        for a in range(len(anchors)):
-            IOUs[g, a] = box_IoU(anchors[a], gold_bboxes[g])
-            IOUs_for_anchors[a, g] = box_IoU(anchors[a], gold_bboxes[g])
+    for a in range(len(anchors)):
+        for g in range(len(gold_bboxes)):
         
-        used_anchors.append(IOUs[g].argmax())
-        anchor_classes[g] = 1 + IOUs[g].argmax() #TADY JE CHYBA PŘI PRVNÍM PRŮCHODU, NESMÍ TAM BÝT INDEX 3(4)
+            IOUs[a, g] = box_IoU(anchors[a], gold_bboxes[g])
+            IOUs_for_gold[g, a] = box_IoU(anchors[a], gold_bboxes[g])
+        
+        
+    for g in range(len(gold_bboxes)):
+        index_anchoru_s_nejvetsim_iou = IOUs_for_gold[g].argmax()
+        if anchor_classes[index_anchoru_s_nejvetsim_iou] == 0:
+            anchor_classes[index_anchoru_s_nejvetsim_iou] = 1 + g  
+
+            used_anchors.append(index_anchoru_s_nejvetsim_iou)
 
     # TODO: For each unused anchors, find the gold object with the largest IoU
     # (again the one with smaller index if there are several), and if the IoU
     # is >= threshold, assign the object to the anchor.
     for a in range(len(anchors)):
-        if anchor_classes[a] not in used_anchors:
-            if IOUs_for_anchors[a].max() > iou_threshold:
-                anchor_classes[g] = 1 + IOUs_for_anchors[a].argmax() 
+        if a not in used_anchors:
+            if IOUs[a].max() >= iou_threshold and anchor_classes[a] == 0:
+                anchor_classes[a] = 1 + IOUs[a].argmax() 
 
     for i in range(len(anchor_classes)):
-        if anchor_classes[i] != 0:
+        if anchor_classes[i] == 0:
             anchor_bboxes[i] = gold_bboxes[ anchor_classes[i]-1 ]
 
     return anchor_classes, anchor_bboxes
