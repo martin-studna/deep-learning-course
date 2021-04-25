@@ -72,9 +72,9 @@ def bboxes_to_fast_rcnn(anchors, bboxes):
         abs(anchors[..., TOP] - anchors[..., BOTTOM]),
         ((bboxes[..., LEFT] + bboxes[..., RIGHT]) / 2 - (anchors[..., LEFT] + anchors[..., RIGHT]) / 2) /
         abs(anchors[..., LEFT] - anchors[..., RIGHT]),
-        BACKEND.log(
+        np.log(
             abs(bboxes[..., TOP] - bboxes[..., BOTTOM]) / abs(anchors[..., TOP] - anchors[..., BOTTOM]) + CONSTANT),
-        BACKEND.log(
+        np.log(
             abs(bboxes[..., LEFT] - bboxes[..., RIGHT]) / abs(anchors[..., LEFT] - anchors[..., RIGHT]) + CONSTANT)
     ], axis=-1)
 
@@ -141,30 +141,29 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
 
     used_anchors = []
 
-
-
-    iou = bboxes_iou(  anchors.reshape(len(anchors), 1, 4), gold_bboxes.reshape(1, len(gold_bboxes) , 4)  )
+    iou = bboxes_iou(anchors.reshape(len(anchors), 1, 4),
+                     gold_bboxes.reshape(1, len(gold_bboxes), 4))
     IOUs = iou
-    IOUs_for_gold = iou.T
-        
+    IOUs_for_gold = BACKEND.transpose(iou)
 
-    for g in range(len(gold_bboxes)):
-        max_anchor_iou_index = IOUs_for_gold[g].argmax()
-        if anchor_classes[max_anchor_iou_index] == 0:
-            anchor_classes[max_anchor_iou_index] = 1 + g
+    max_ious_indices = BACKEND.argmax(IOUs_for_gold, axis=-1)
+    max_anchor_classes = anchor_classes[max_ious_indices]
+    max_anchor_classes = BACKEND.where(
+        max_anchor_classes == 0, 1 + BACKEND.arange(len(gold_bboxes)), max_anchor_classes)
+    anchor_classes[BACKEND.unique(max_ious_indices)] = max_anchor_classes[:len(
+        BACKEND.unique(max_ious_indices))]
 
     # TODO: For each unused anchors, find the gold object with the largest IoU
     # (again the one with smaller index if there are several), and if the IoU
     # is >= threshold, assign the object to the anchor.
-    for a in range(len(anchors)):
-        if IOUs[a].max() >= iou_threshold and anchor_classes[a] == 0:
-            anchor_classes[a] = 1 + IOUs[a].argmax()
 
-    for i in range(len(anchor_classes)):
-        if anchor_classes[i] != 0:
-            anchor_bboxes[i] = bboxes_to_fast_rcnn(
-                BACKEND.array([anchors[i]]), BACKEND.array([gold_bboxes[anchor_classes[i]-1]]))
-            anchor_classes[i] = gold_classes[anchor_classes[i]-1] + 1
+    anchor_classes = BACKEND.where(BACKEND.logical_and(IOUs.max(axis=-1) >= iou_threshold,
+                                                       anchor_classes == 0), 1 + IOUs.argmax(axis=-1), anchor_classes)
+
+    nonzero_anchor_classes_indices = BACKEND.where(anchor_classes != 0)
+    anchor_bboxes[nonzero_anchor_classes_indices] = bboxes_to_fast_rcnn(
+        anchors[nonzero_anchor_classes_indices], gold_bboxes[anchor_classes[nonzero_anchor_classes_indices]-1])
+    anchor_classes[nonzero_anchor_classes_indices] = gold_classes[anchor_classes[nonzero_anchor_classes_indices]-1] + 1
 
     return anchor_classes, anchor_bboxes
 
