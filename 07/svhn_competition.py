@@ -80,15 +80,19 @@ def main(args):
     004:array([ 0.05769231, -0.15      ,  0.55769231,  0.15      ])
     '''
 
-    a1 = [0.2,0.3]
-    a2 = [0.3,0.6]
-    a3 = [0.4,0.75]
-    anchors_count = 3
+    a1 = [0.15,0.2]
+    a2 = [0.2,0.3]
+    a3 = [0.3,0.6]
+    a4 = [0.4,0.75]
+    a5 = [0.5,0.85]
+    anchors_count = 5
     for y in np.linspace(0,1,14):
         for x in np.linspace(0,1,14):
             my_anchors.append(  (y-a1[1]/2, x-a1[0]/2, y+a1[1]/2, x+a1[0]/2 )    )
             my_anchors.append(  (y-a2[1]/2, x-a2[0]/2, y+a2[1]/2, x+a2[0]/2 )    )
             my_anchors.append(  (y-a3[1]/2, x-a3[0]/2, y+a3[1]/2, x+a3[0]/2 )    )
+            my_anchors.append(  (y-a4[1]/2, x-a4[0]/2, y+a4[1]/2, x+a4[0]/2 )    )
+            my_anchors.append(  (y-a5[1]/2, x-a5[0]/2, y+a5[1]/2, x+a5[0]/2 )    )
 
     my_anchors = np.array(my_anchors)
     #co je anchor
@@ -106,10 +110,13 @@ def main(args):
     all_sample_weights = []
 
     all_g_boxes = []
+    x_train_nasobky = []
+
     for i in range(len(t)):
         h, w, c = t[i][0].shape
         nasobek_h = strana / h 
         nasobek_w = strana / w 
+        x_train_nasobky.append([nasobek_h, nasobek_w])
         img= cv2.resize(t[i][0], (strana,strana)  )
         x_train.append( img )
             
@@ -128,8 +135,8 @@ def main(args):
         #draw(img, g_boxes * strana)
 
         cat_classes = keras.utils.to_categorical(  classes, 11    )
-        if i < 10:
-            draw(img, my_anchors[ cat_classes.argmax(axis=1) > 0] * strana)
+        #if i < 10:
+        #    draw(img, my_anchors[ cat_classes.argmax(axis=1) > 0] * strana)
         #draw(img, my_anchors[7+7*14:8+7*14] * strana)
 
 
@@ -153,9 +160,13 @@ def main(args):
     x_dev = np.array(x_dev)
 
     x_test = []
+    x_test_nasobky = []
     for i in range(len(test_list)):
-        
+        h, w, c = test_list[i].shape
+        nasobek_h = strana / h 
+        nasobek_w = strana / w         
         x_test.append( cv2.resize(test_list[i], (strana,strana)  ) )
+        x_test_nasobky.append([nasobek_h, nasobek_w])
     x_test = np.array(x_test)
 
 
@@ -221,7 +232,11 @@ def main(args):
         'classes_output': keras.metrics.BinaryAccuracy(),
         } 
 
-    model.compile(optimizer=keras.optimizers.Adam(0.001), 
+    batch_size = 32
+    epochs = 20
+    decay_steps = epochs * len(t) / batch_size
+    lr_decayed_fn = keras.experimental.CosineDecay( 0.01, decay_steps, alpha=0.00001)
+    model.compile(optimizer=keras.optimizers.Adam(lr_decayed_fn), 
     loss=  losses, 
     metrics=metrics , 
     run_eagerly=False    )
@@ -233,10 +248,75 @@ def main(args):
     #číslo 2
     #0 0 0 1 0 0 0 0 0 0 0 
 
+
+
+
+    def save_data(set= x_dev, nasobky=x_dev_nasobky, fname='dev',max_rois = 5, iou_threshold = 0.2, score_threshold = 0.2, evaluate=False):
+        print(f'max_rois = {max_rois}, iou_threshold = {iou_threshold}, score_threshold = {score_threshold}')
+        with open(f"svhn_competition_{fname}.txt", "w", encoding="utf-8") as predictions_file:
+            # TODO: Predict the digits and their bounding boxes on the test set.
+            # Assume that for a single test image we get
+            # - `predicted_classes`: a 1D array with the predicted digits,
+            # - `predicted_bboxes`: a [len(predicted_classes), 4] array with bboxes;
+
+            tpredicted_classes, tpredicted_bboxes = model.predict(x_dev, batch_size=32) #DEV TEST
+        
+            #for predicted_classes, predicted_bboxes in zip(tpredicted_classes, tpredicted_bboxes):
+            for i in range(len(tpredicted_classes)):
+                scores = tpredicted_classes[i,:,1:].max(axis=1)
+                predicted_classes = tpredicted_classes[i,:,1:].argmax(axis=1)
+                predicted_bboxes = tpredicted_bboxes[i] 
+
+                predicted_bboxess = bboxes_utils.bboxes_from_fast_rcnn( my_anchors ,predicted_bboxes) * strana
+                
+                selected_indices = tf.image.non_max_suppression(predicted_bboxess, scores, max_rois, iou_threshold=iou_threshold, score_threshold=score_threshold).numpy()
+                #selected_boxes = tf.gather(predicted_bboxess, selected_indices)
+                selected_boxes = predicted_bboxess[ selected_indices]
+                selected_scores = scores[ selected_indices]
+                selected_predicted_classes = predicted_classes[ selected_indices]
+
+                orig_selected_boxes = np.array(selected_boxes)
+                orig_selected_boxes[:, 0] /= x_dev_nasobky[i][0] #DEV TEST H
+                orig_selected_boxes[:, 2] /= x_dev_nasobky[i][0] #DEV TEST H
+                orig_selected_boxes[:, 1] /= x_dev_nasobky[i][1] #DEV TEST W
+                orig_selected_boxes[:, 3] /= x_dev_nasobky[i][1] #DEV TEST W
+
+                #if i < 20:
+                #    print(selected_predicted_classes+1)
+                #    draw(x_dev[i], selected_boxes)
+
+
+                output = ""
+                for label, bbox in zip(selected_predicted_classes, orig_selected_boxes):
+                    #output += [label] + bbox
+                    output += str(label+1)+ " " + str(int(bbox[0]))+ " " +  str(int(bbox[1]))+ " " +  str(int(bbox[2]))+ " " +  str(int(bbox[3])) + " " 
+                print(*output, file=predictions_file, sep='')
+        if evaluate:
+            os.system(f'python .\svhn_dataset.py --evaluate svhn_competition_{fname}.txt --dataset {fname}')
+
+    def save_train(max_rois = 5, iou_threshold = 0.2, score_threshold = 0.28):
+        save_data(set=x_train, nasobky=x_train_nasobky, fname='train' ,max_rois = max_rois, iou_threshold = iou_threshold, score_threshold = score_threshold, evaluate=True)
+
+    def save_dev(max_rois = 5, iou_threshold = 0.2, score_threshold = 0.28):
+        save_data(set=x_dev, nasobky=x_dev_nasobky, fname='dev' ,max_rois = max_rois, iou_threshold = iou_threshold, score_threshold = score_threshold, evaluate=True)
+
+    def save_test(max_rois = 5, iou_threshold = 0.2, score_threshold = 0.28):
+        save_data(set=x_train, nasobky=x_test_nasobky, fname='dev' ,max_rois = max_rois, iou_threshold = iou_threshold, score_threshold = score_threshold, evaluate=False)
+
+
+    from tensorflow.keras.callbacks import Callback
+    class MyCallback(Callback):
+        def on_epoch_end(self, epoch, logs=None):
+            save_dev()
+
     #model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=16, epochs=1, sample_weight={ 'classes_output': np.ones_like(all_sample_weights) , 'bboxes_output': all_sample_weights    } )
-    model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=32, epochs=200, sample_weight={ 'bboxes_output': all_sample_weights     } )
+    model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=batch_size, epochs=epochs, sample_weight={ 'bboxes_output': all_sample_weights     } , callbacks=[MyCallback])
     #model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=2, epochs=1, sample_weight={ 'classes_output': all_sample_weights, 'bboxes_output': all_sample_weights    } )
     #https://github.com/fizyr/keras-retinanet/blob/master/keras_retinanet/bin/train.py
+
+    #po 50 :
+    # max_rois = 5, iou_threshold = 0.2, score_threshold = 0.28
+    #SVHN accuracy: 62.35%
 
     #model.predict( np.array( [ t[0][0]] )  )[0].argmax(axis=2)  
 
@@ -244,48 +324,7 @@ def main(args):
     ''' '''
     model = keras.models.load_model('model.h5')
 
-    # Generate test set annotations, but in args.logdir to allow parallel execution.
-    os.makedirs(args.logdir, exist_ok=True)
-    with open("svhn_competition_dev.txt", "w", encoding="utf-8") as predictions_file:
-        # TODO: Predict the digits and their bounding boxes on the test set.
-        # Assume that for a single test image we get
-        # - `predicted_classes`: a 1D array with the predicted digits,
-        # - `predicted_bboxes`: a [len(predicted_classes), 4] array with bboxes;
-
-        tpredicted_classes, tpredicted_bboxes = model.predict(x_dev, batch_size=32)
-    
-        #for predicted_classes, predicted_bboxes in zip(tpredicted_classes, tpredicted_bboxes):
-        for i in range(len(tpredicted_classes)):
-            scores = tpredicted_classes[i,:,1:].max(axis=1)
-            predicted_classes = tpredicted_classes[i,:,1:].argmax(axis=1)
-            predicted_bboxes = tpredicted_bboxes[i] 
-
-            predicted_bboxess = bboxes_utils.bboxes_from_fast_rcnn( my_anchors ,predicted_bboxes) * strana
-            
-            selected_indices = tf.image.non_max_suppression(predicted_bboxess, scores, 5, iou_threshold=0.2, score_threshold=0.2).numpy()
-            #selected_boxes = tf.gather(predicted_bboxess, selected_indices)
-            selected_boxes = predicted_bboxess[ selected_indices]
-            selected_scores = scores[ selected_indices]
-            selected_predicted_classes = predicted_classes[ selected_indices]
-
-            orig_selected_boxes = np.array(selected_boxes)
-            orig_selected_boxes[:, 0] /= x_dev_nasobky[i][0] #DEV TEST H
-            orig_selected_boxes[:, 2] /= x_dev_nasobky[i][0] #DEV TEST H
-            orig_selected_boxes[:, 1] /= x_dev_nasobky[i][1] #DEV TEST W
-            orig_selected_boxes[:, 3] /= x_dev_nasobky[i][1] #DEV TEST W
-
-            if i < 20:
-                print(selected_predicted_classes+1)
-                draw(x_dev[i], selected_boxes)
-
-
-            output = ""
-            for label, bbox in zip(selected_predicted_classes, orig_selected_boxes):
-                #output += [label] + bbox
-                #if label != 0:
-                output += str(label+1)+ " " + str(int(bbox[0]))+ " " +  str(int(bbox[1]))+ " " +  str(int(bbox[2]))+ " " +  str(int(bbox[3])) + " " 
-            print(*output, file=predictions_file, sep='')
-            #print(' '.join(output), file=predictions_file)
+    print('ende') 
 
 
 if __name__ == "__main__":
