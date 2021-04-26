@@ -72,8 +72,8 @@ def main(args):
 
     a1 = [0.4,0.3]
 
-    for x in range(10):
-        for y in range(10):
+    for x in np.arange(0,1, 0.1):
+        for y in np.arange(0,1, 0.1):
             my_anchors.append(  (y-a1[1], x-a1[0], y+a1[1], x+a1[0])    )
 
     my_anchors = np.array(my_anchors)
@@ -82,6 +82,9 @@ def main(args):
     #co je bbox
     #kdy voláme bboxes_training
     #roi pooling
+
+    strana = 46
+
     x_train = []
 
     all_cat_classes = []
@@ -89,10 +92,20 @@ def main(args):
     all_sample_weights = []
 
     for i in range(len(t)):
-        x_train.append( cv2.resize(t[i][0], (46,46)  ) )
+        h, w, c = t[i][0].shape
+        nasobek_h = strana / h 
+        nasobek_w = strana / w 
+        img= cv2.resize(t[i][0], (46,46)  )
+        x_train.append( img )
             
-        
-        classes, bboxesy = bboxes_utils.bboxes_training( my_anchors, t[i][2], t[i][1], 0.5 )
+        g_boxes = np.array( t[i][1] )
+        g_boxes[:,0] *= nasobek_h / strana
+        g_boxes[:,2] *= nasobek_h / strana
+        g_boxes[:,1] *= nasobek_w / strana
+        g_boxes[:,3] *= nasobek_w / strana
+
+        classes, bboxesy = bboxes_utils.bboxes_training( my_anchors, t[i][2], g_boxes , 0.2 )
+        #draw(img, g_boxes * strana)
         cat_classes = keras.utils.to_categorical(  classes, 11    )
 
         all_bboxes.append(bboxesy)
@@ -109,7 +122,7 @@ def main(args):
         x_test.append( cv2.resize(test_list[i], (46,46)  ) )
     x_test = np.array(x_test)
 
-
+    
 
     # Load the EfficientNet-B0 model
     efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(
@@ -117,20 +130,20 @@ def main(args):
 
     # TODO: Create the model and train it
     input_l = keras.layers.Input(shape=(46,46,3))
-    #o0, o1, o2, *_ = efficientnet_b0(input_l)
-    x = keras.layers.Conv2D(32, 7)(input_l)
-    x = keras.layers.Conv2D(32, 5)(x)
-    x = keras.layers.Conv2D(32, 7, strides=2 )(x)
-    x = keras.layers.Conv2D(32, 3, )(x)
-    x = keras.layers.Conv2D(32, 4, )(x)
+    o0, o1, o2, o3, o4, o5*_ = efficientnet_b0(input_l)
+    x = keras.layers.Conv2D(32, 7, activation='relu')(input_l)
+    x = keras.layers.Conv2D(32, 5, activation='relu')(x)
+    x = keras.layers.Conv2D(32, 7, strides=2, activation='relu' )(x)
+    x = keras.layers.Conv2D(32, 3, activation='relu' )(x)
+    x = keras.layers.Conv2D(32, 4, activation='relu' )(x)
 
-    classes = keras.layers.Conv2D(11, 11, padding='same')(x)
+    classes = keras.layers.Conv2D(11, 11, padding='same', activation='relu')(x)
     classes = keras.layers.Reshape((100,11))(classes)
     classes = keras.layers.Activation('softmax', name="classes_output")(classes)
     #classes = keras.layers.Flatten(name="classes_output")(classes)
 
 
-    bboxes = keras.layers.Conv2D(4, 11, padding='same')(x)
+    bboxes = keras.layers.Conv2D(4, 11, padding='same', activation='relu')(x)
     bboxes = keras.layers.Reshape((100,4), name="bboxes_output")(bboxes)
 
     model = keras.models.Model(inputs=[input_l], outputs=[classes, bboxes]   )
@@ -150,19 +163,22 @@ def main(args):
         'classes_output': keras.metrics.CategoricalAccuracy(),
         } 
 
-    model.compile(optimizer=keras.optimizers.Adam(), 
+    model.compile(optimizer=keras.optimizers.Adam(0.0001), 
     loss=  losses, 
     metrics=metrics , 
     run_eagerly=True    )
 
 
 
-    #model.fit( x_train,  { 'classes_output': all_cat_classes , 'bboxes_output': all_bboxes    } ,batch_size=20, epochs=10, sample_weight=[all_sample_weights,all_sample_weights] )
-    model.fit( x_train,  { 'classes_output': all_cat_classes, 'bboxes_output': all_bboxes } ,batch_size=50, epochs=1 )
+    model.fit( x_train,  { 'classes_output': all_cat_classes , 'bboxes_output': all_bboxes    } ,batch_size=20, epochs=10, sample_weight=[all_sample_weights,all_sample_weights] )
+    #model.fit( x_train,  { 'classes_output': all_cat_classes, 'bboxes_output': all_bboxes } ,batch_size=50, epochs=20 )
     #https://github.com/fizyr/keras-retinanet/blob/master/keras_retinanet/bin/train.py
 
     #model.predict( np.array( [ t[0][0]] )  )[0].argmax(axis=2)  
 
+    model.save('model.h5')
+    
+    model = keras.models.load_model('model.h5')
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
@@ -176,12 +192,21 @@ def main(args):
     
         #for predicted_classes, predicted_bboxes in zip(tpredicted_classes, tpredicted_bboxes):
         for i in range(len(tpredicted_classes)):
+            scores = tpredicted_classes[i].max(axis=1)
             predicted_classes = tpredicted_classes[i].argmax(axis=1)
-            predicted_bboxes = tpredicted_bboxes[i]
-            predicted_bboxess = bboxes_utils.bboxes_from_fast_rcnn( my_anchors ,predicted_bboxes)
+            predicted_bboxes = tpredicted_bboxes[i] 
+            predicted_bboxess = bboxes_utils.bboxes_from_fast_rcnn( my_anchors ,predicted_bboxes) * 46
+
+            selected_indices = tf.image.non_max_suppression(predicted_bboxess, scores, 5).numpy()
+            #selected_boxes = tf.gather(predicted_bboxess, selected_indices)
+            selected_boxes = predicted_bboxess[ selected_indices]
+
+
+            if i < 10:
+                draw(x_test[i], selected_boxes)
 
             output = ""
-            for label, bbox in zip(predicted_classes, predicted_bboxess):
+            for label, bbox in zip(predicted_classes, selected_boxes):
                 #output += [label] + bbox
                 if label != 0:
                     output += str(label-1)+ " " + str(int(bbox[0]))+ " " +  str(int(bbox[1]))+ " " +  str(int(bbox[2]))+ " " +  str(int(bbox[3])) + " " 
