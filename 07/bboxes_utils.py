@@ -6,7 +6,7 @@ import tensorflow as tf
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
-BACKEND = np  # or you can use `tf` for TensorFlow implementation
+BACKEND = tf  # or you can use `tf` for TensorFlow implementation
 
 TOP, LEFT, BOTTOM, RIGHT = range(4)
 
@@ -132,30 +132,42 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     # several gold objects are assigned to a single anchor, use the gold object
     # with smaller index.
 
-    # pro anchorum přiřadíme gold_bbox_index
-    anchor_classes = BACKEND.zeros((len(anchors)), dtype=BACKEND.uint16)
+    anchor_classes = BACKEND.zeros((len(anchors)), dtype=BACKEND.int32)
     anchor_bboxes = BACKEND.zeros((len(anchors), 4))
-
-    IOUs = BACKEND.zeros((len(anchors), len(gold_bboxes)))
-    IOUs_for_gold = BACKEND.zeros((len(gold_bboxes), len(anchors)))
-
-    used_anchors = []
 
     iou = bboxes_iou(anchors.reshape(len(anchors), 1, 4),
                      gold_bboxes.reshape(1, len(gold_bboxes), 4))
     IOUs = iou
     IOUs_for_gold = BACKEND.transpose(iou)
 
-    max_ious_indices = BACKEND.argmax(IOUs_for_gold, axis=-1)
-    max_anchor_classes = anchor_classes[max_ious_indices]
-    max_anchor_classes = BACKEND.where(
-        max_anchor_classes == 0, 1 + BACKEND.arange(len(gold_bboxes)), max_anchor_classes)
-    anchor_classes[BACKEND.unique(max_ious_indices)] = max_anchor_classes[:len(
-        BACKEND.unique(max_ious_indices))]
+    if BACKEND == tf:
+        max_ious_indices = BACKEND.argmax(
+            IOUs_for_gold, axis=-1, output_type=tf.int32)
+    else:
+        max_ious_indices = BACKEND.argmax(
+            IOUs_for_gold, axis=-1)
 
-    # TODO: For each unused anchors, find the gold object with the largest IoU
-    # (again the one with smaller index if there are several), and if the IoU
-    # is >= threshold, assign the object to the anchor.
+    if BACKEND == tf:
+        max_anchor_classes = tf.gather(anchor_classes, max_ious_indices)
+    else:
+        max_anchor_classes = anchor_classes[max_ious_indices]
+
+    if BACKEND == tf:
+        max_anchor_classes = BACKEND.where(
+            max_anchor_classes == 0, 1 + tf.range(len(gold_bboxes)), max_anchor_classes)
+    else:
+        max_anchor_classes = BACKEND.where(
+            max_anchor_classes == 0, 1 + np.arange(len(gold_bboxes)), max_anchor_classes)
+
+    if BACKEND == np:
+        anchor_classes[BACKEND.unique(max_ious_indices)] = max_anchor_classes[:len(
+            BACKEND.unique(max_ious_indices))]
+
+        #anchor_classes = tf.convert_to_tensor(var_anchor_classes)
+
+        # TODO: For each unused anchors, find the gold object with the largest IoU
+        # (again the one with smaller index if there are several), and if the IoU
+        # is >= threshold, assign the object to the anchor.
 
     anchor_classes = BACKEND.where(BACKEND.logical_and(IOUs.max(axis=-1) >= iou_threshold,
                                                        anchor_classes == 0), 1 + IOUs.argmax(axis=-1), anchor_classes)
