@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import unittest
 import numpy as np
-import tensorflow as tf
+#import tensorflow as tf
 
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
@@ -134,7 +134,7 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
 
     # pro anchorum přiřadíme gold_bbox_index
     anchor_classes = BACKEND.zeros((len(anchors)), dtype=BACKEND.uint16)
-    anchor_bboxes = BACKEND.zeros((len(anchors), 4))
+    anchor_bboxes = np.zeros((len(anchors), 4))
 
     IOUs = BACKEND.zeros((len(anchors), len(gold_bboxes)))
     IOUs_for_gold = BACKEND.zeros((len(gold_bboxes), len(anchors)))
