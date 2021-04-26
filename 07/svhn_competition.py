@@ -144,6 +144,38 @@ def main(args):
         all_cat_classes.append(cat_classes)
         all_sample_weights.append(( cat_classes.argmax(axis=1) > 0).astype(np.float32) )
 
+    for i in range(len(t)):
+        h, w, c = t[i][0].shape
+        nasobek_h = strana / h 
+        nasobek_w = strana / w 
+        x_train_nasobky.append([nasobek_h, nasobek_w])
+        img= 1-cv2.resize(t[i][0], (strana,strana)  )
+        x_train.append( img )
+            
+        g_boxes = np.array( t[i][1] )
+        g_boxes[:,0] *= nasobek_h / strana
+        g_boxes[:,2] *= nasobek_h / strana
+        g_boxes[:,1] *= nasobek_w / strana
+        g_boxes[:,3] *= nasobek_w / strana
+
+        '''
+        for j in range(len(g_boxes)):
+            all_g_boxes.append(g_boxes[j])
+        continue
+        '''
+        classes, bboxesy = bboxes_utils.bboxes_training( my_anchors, t[i][2], g_boxes , 0.5 )
+        #draw(img, g_boxes * strana)
+
+        cat_classes = keras.utils.to_categorical(  classes, 11    )
+        #if i < 10:
+        #    draw(img, my_anchors[ cat_classes.argmax(axis=1) > 0] * strana)
+        #draw(img, my_anchors[7+7*14:8+7*14] * strana)
+
+
+        all_bboxes.append(bboxesy)
+        all_cat_classes.append(cat_classes)
+        all_sample_weights.append(( cat_classes.argmax(axis=1) > 0).astype(np.float32) )
+
     x_train = np.array(x_train)
     all_cat_classes = np.array(all_cat_classes)
     all_bboxes = np.array(all_bboxes)
@@ -234,7 +266,7 @@ def main(args):
 
     batch_size = 32
     epochs = 20
-    decay_steps = epochs * len(t) / batch_size
+    decay_steps = epochs * len(t)*2 / batch_size
     lr_decayed_fn = keras.experimental.CosineDecay( 0.01, decay_steps, alpha=0.00001)
     model.compile(optimizer=keras.optimizers.Adam(lr_decayed_fn), 
     loss=  losses, 
@@ -301,7 +333,7 @@ def main(args):
         save_data(set=x_dev, nasobky=x_dev_nasobky, fname='dev' ,max_rois = max_rois, iou_threshold = iou_threshold, score_threshold = score_threshold, evaluate=True)
 
     def save_test(max_rois = 5, iou_threshold = 0.2, score_threshold = 0.28):
-        save_data(set=x_train, nasobky=x_test_nasobky, fname='dev' ,max_rois = max_rois, iou_threshold = iou_threshold, score_threshold = score_threshold, evaluate=False)
+        save_data(set=x_train, nasobky=x_test_nasobky, fname='test' ,max_rois = max_rois, iou_threshold = iou_threshold, score_threshold = score_threshold, evaluate=False)
 
 
     from tensorflow.keras.callbacks import Callback
@@ -310,13 +342,17 @@ def main(args):
             save_dev()
 
     #model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=16, epochs=1, sample_weight={ 'classes_output': np.ones_like(all_sample_weights) , 'bboxes_output': all_sample_weights    } )
-    model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=batch_size, epochs=epochs, sample_weight={ 'bboxes_output': all_sample_weights     } , callbacks=[MyCallback])
+    model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=batch_size, epochs=epochs, sample_weight={ 'bboxes_output': all_sample_weights     } , callbacks=[MyCallback()])
     #model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=2, epochs=1, sample_weight={ 'classes_output': all_sample_weights, 'bboxes_output': all_sample_weights    } )
     #https://github.com/fizyr/keras-retinanet/blob/master/keras_retinanet/bin/train.py
 
     #po 50 :
     # max_rois = 5, iou_threshold = 0.2, score_threshold = 0.28
     #SVHN accuracy: 62.35%
+
+    #po 20 : cosine , max_rois = 5, iou_threshold = 0.2, score_threshold = 0.28
+    #SVHN accuracy: 64.48%
+
 
     #model.predict( np.array( [ t[0][0]] )  )[0].argmax(axis=2)  
 
