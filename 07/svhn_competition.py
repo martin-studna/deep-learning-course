@@ -63,6 +63,9 @@ def main(args):
     train = svhn.train.map(lambda data: (data['image'], data['bboxes'], data['classes'])).take(-1)
     t = list(train.as_numpy_iterator())    
     
+    dev = svhn.dev.map(lambda data: (data['image']) ).take(-1)
+    dev_list = list(dev.as_numpy_iterator())
+
     test = svhn.test.map(lambda data: (data['image']) ).take(-1)
     test_list = list(test.as_numpy_iterator())
 
@@ -77,11 +80,15 @@ def main(args):
     004:array([ 0.05769231, -0.15      ,  0.55769231,  0.15      ])
     '''
 
-    a1 = [0.3,0.5]
-    
+    a1 = [0.2,0.3]
+    a2 = [0.3,0.6]
+    a3 = [0.4,0.75]
+    anchors_count = 3
     for y in np.linspace(0,1,14):
         for x in np.linspace(0,1,14):
             my_anchors.append(  (y-a1[1]/2, x-a1[0]/2, y+a1[1]/2, x+a1[0]/2 )    )
+            my_anchors.append(  (y-a2[1]/2, x-a2[0]/2, y+a2[1]/2, x+a2[0]/2 )    )
+            my_anchors.append(  (y-a3[1]/2, x-a3[0]/2, y+a3[1]/2, x+a3[0]/2 )    )
 
     my_anchors = np.array(my_anchors)
     #co je anchor
@@ -98,6 +105,7 @@ def main(args):
     all_bboxes = []
     all_sample_weights = []
 
+    all_g_boxes = []
     for i in range(len(t)):
         h, w, c = t[i][0].shape
         nasobek_h = strana / h 
@@ -111,6 +119,11 @@ def main(args):
         g_boxes[:,1] *= nasobek_w / strana
         g_boxes[:,3] *= nasobek_w / strana
 
+        '''
+        for j in range(len(g_boxes)):
+            all_g_boxes.append(g_boxes[j])
+        continue
+        '''
         classes, bboxesy = bboxes_utils.bboxes_training( my_anchors, t[i][2], g_boxes , 0.5 )
         #draw(img, g_boxes * strana)
 
@@ -129,8 +142,19 @@ def main(args):
     all_bboxes = np.array(all_bboxes)
     all_sample_weights = np.array(all_sample_weights)
 
+    x_dev = []
+    x_dev_nasobky = []
+    for i in range(len(dev_list)):
+        h, w, c = dev_list[i].shape
+        nasobek_h = strana / h 
+        nasobek_w = strana / w 
+        x_dev.append( cv2.resize(dev_list[i], (strana,strana)  ) )
+        x_dev_nasobky.append([nasobek_h, nasobek_w])
+    x_dev = np.array(x_dev)
+
     x_test = []
     for i in range(len(test_list)):
+        
         x_test.append( cv2.resize(test_list[i], (strana,strana)  ) )
     x_test = np.array(x_test)
 
@@ -139,7 +163,8 @@ def main(args):
     efficientnet_b0 = efficient_net.pretrained_efficientnet_b0(
         include_top=False)
     efficientnet_b0.trainable = False    
-
+    
+    
     # TODO: Create the model and train it
     input_l = keras.layers.Input(shape=(strana,strana,3))
     o0, o1, o2, o3, o4, o5, *_ = efficientnet_b0(input_l)
@@ -156,9 +181,13 @@ def main(args):
     classes = keras.layers.BatchNormalization()(classes)
     classes = keras.layers.Activation('relu')(classes)
 
+    classes = keras.layers.Conv2D(256, 3, padding='same')(classes)
+    classes = keras.layers.BatchNormalization()(classes)
+    classes = keras.layers.Activation('relu')(classes)
 
-    classes = keras.layers.Conv2D(10, 3, padding='same', activation='sigmoid')(classes)
-    classes = keras.layers.Reshape((14*14,10), name="classes_output" )(classes)
+
+    classes = keras.layers.Conv2D(10*anchors_count, 3, padding='same', activation='sigmoid')(classes)
+    classes = keras.layers.Reshape((14*14*anchors_count,10), name="classes_output" )(classes)
     #classes = keras.layers.Activation('sigmoid')(classes)
     #classes = keras.layers.Flatten(name="classes_output")(classes)
 
@@ -171,9 +200,13 @@ def main(args):
     bboxes = keras.layers.BatchNormalization()(bboxes)
     bboxes = keras.layers.Activation('relu')(bboxes)
 
+    bboxes = keras.layers.Conv2D(256, 3, padding='same')(bboxes)
+    bboxes = keras.layers.BatchNormalization()(bboxes)
+    bboxes = keras.layers.Activation('relu')(bboxes)
 
-    bboxes = keras.layers.Conv2D(4, 3, padding='same')(bboxes)
-    bboxes = keras.layers.Reshape((14*14,4), name="bboxes_output")(bboxes)
+
+    bboxes = keras.layers.Conv2D(4*anchors_count, 3, padding='same')(bboxes)
+    bboxes = keras.layers.Reshape((14*14*anchors_count,4), name="bboxes_output")(bboxes)
 
     model = keras.models.Model(inputs=[input_l], outputs=[classes, bboxes]   )
     model.summary()
@@ -188,34 +221,38 @@ def main(args):
         'classes_output': keras.metrics.BinaryAccuracy(),
         } 
 
-    model.compile(optimizer=keras.optimizers.Adam(), 
+    model.compile(optimizer=keras.optimizers.Adam(0.001), 
     loss=  losses, 
     metrics=metrics , 
     run_eagerly=False    )
 
     #sample weight shape: (10000, 196)
 
+    #pozadí 0
+    #1 0 0 0 0 0 0 0 0 0 0 
+    #číslo 2
+    #0 0 0 1 0 0 0 0 0 0 0 
+
     #model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=16, epochs=1, sample_weight={ 'classes_output': np.ones_like(all_sample_weights) , 'bboxes_output': all_sample_weights    } )
-    model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=16, epochs=1, sample_weight={ 'bboxes_output': all_sample_weights     } )
+    model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=32, epochs=200, sample_weight={ 'bboxes_output': all_sample_weights     } )
     #model.fit( x_train,  { 'classes_output': all_cat_classes[:,:,1:] , 'bboxes_output': all_bboxes    } ,batch_size=2, epochs=1, sample_weight={ 'classes_output': all_sample_weights, 'bboxes_output': all_sample_weights    } )
     #https://github.com/fizyr/keras-retinanet/blob/master/keras_retinanet/bin/train.py
 
     #model.predict( np.array( [ t[0][0]] )  )[0].argmax(axis=2)  
 
     model.save('model.h5')
-    ''' 
-    '''
+    ''' '''
     model = keras.models.load_model('model.h5')
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
-    with open("svhn_competition.txt", "w", encoding="utf-8") as predictions_file:
+    with open("svhn_competition_dev.txt", "w", encoding="utf-8") as predictions_file:
         # TODO: Predict the digits and their bounding boxes on the test set.
         # Assume that for a single test image we get
         # - `predicted_classes`: a 1D array with the predicted digits,
         # - `predicted_bboxes`: a [len(predicted_classes), 4] array with bboxes;
 
-        tpredicted_classes, tpredicted_bboxes = model.predict(x_test, batch_size=32)
+        tpredicted_classes, tpredicted_bboxes = model.predict(x_dev, batch_size=32)
     
         #for predicted_classes, predicted_bboxes in zip(tpredicted_classes, tpredicted_bboxes):
         for i in range(len(tpredicted_classes)):
@@ -224,19 +261,26 @@ def main(args):
             predicted_bboxes = tpredicted_bboxes[i] 
 
             predicted_bboxess = bboxes_utils.bboxes_from_fast_rcnn( my_anchors ,predicted_bboxes) * strana
-
+            
             selected_indices = tf.image.non_max_suppression(predicted_bboxess, scores, 5, iou_threshold=0.2, score_threshold=0.2).numpy()
             #selected_boxes = tf.gather(predicted_bboxess, selected_indices)
             selected_boxes = predicted_bboxess[ selected_indices]
             selected_scores = scores[ selected_indices]
             selected_predicted_classes = predicted_classes[ selected_indices]
 
-            if i < 10:
-                print(selected_predicted_classes)
-                draw(x_test[i], selected_boxes)
+            orig_selected_boxes = np.array(selected_boxes)
+            orig_selected_boxes[:, 0] /= x_dev_nasobky[i][0] #DEV TEST H
+            orig_selected_boxes[:, 2] /= x_dev_nasobky[i][0] #DEV TEST H
+            orig_selected_boxes[:, 1] /= x_dev_nasobky[i][1] #DEV TEST W
+            orig_selected_boxes[:, 3] /= x_dev_nasobky[i][1] #DEV TEST W
+
+            if i < 20:
+                print(selected_predicted_classes+1)
+                draw(x_dev[i], selected_boxes)
+
 
             output = ""
-            for label, bbox in zip(selected_predicted_classes, selected_boxes):
+            for label, bbox in zip(selected_predicted_classes, orig_selected_boxes):
                 #output += [label] + bbox
                 #if label != 0:
                 output += str(label+1)+ " " + str(int(bbox[0]))+ " " +  str(int(bbox[1]))+ " " +  str(int(bbox[2]))+ " " +  str(int(bbox[3])) + " " 
