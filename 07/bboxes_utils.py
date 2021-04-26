@@ -6,7 +6,7 @@ import tensorflow as tf
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
-BACKEND = tf  # or you can use `tf` for TensorFlow implementation
+BACKEND = np  # or you can use `tf` for TensorFlow implementation
 
 TOP, LEFT, BOTTOM, RIGHT = range(4)
 
