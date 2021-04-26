@@ -172,7 +172,8 @@ def bboxes_training(anchors, gold_classes, gold_bboxes, iou_threshold):
     anchor_classes = BACKEND.where(BACKEND.logical_and(IOUs.max(axis=-1) >= iou_threshold,
                                                        anchor_classes == 0), 1 + IOUs.argmax(axis=-1), anchor_classes)
 
-    nonzero_anchor_classes_indices = BACKEND.where(anchor_classes != 0)
+    nonzero_anchor_classes_indices = BACKEND.where(
+        anchor_classes != 0)
     anchor_bboxes[nonzero_anchor_classes_indices] = bboxes_to_fast_rcnn(
         anchors[nonzero_anchor_classes_indices], gold_bboxes[anchor_classes[nonzero_anchor_classes_indices]-1])
     anchor_classes[nonzero_anchor_classes_indices] = gold_classes[anchor_classes[nonzero_anchor_classes_indices]-1] + 1

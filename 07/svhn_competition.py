@@ -14,13 +14,16 @@ import cv2
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
+os.environ["KERAS_BACKEND"] = "plaidml.keras.backend"
+
+
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=None,
+parser.add_argument("--epochs", default=1,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int,
@@ -75,9 +78,9 @@ def main(args):
     aspect_ratios = np.array([0.3, 0.5])
 
     for y in np.linspace(0, 1, 14):
-        x_s = np.linspace(0, 1, 14)
-        my_anchors.append(
-            (y - aspect_ratios[1] / 2, x_s - aspect_ratios[0] / 2, y + aspect_ratios[1] / 2, x_s + aspect_ratios[0] / 2))
+        for x in np.linspace(0, 1, 14):
+            my_anchors.append(
+                (y - aspect_ratios[1] / 2, x - aspect_ratios[0] / 2, y + aspect_ratios[1] / 2, x + aspect_ratios[0] / 2))
 
     SIDE_SIZE = 224
 
@@ -106,9 +109,6 @@ def main(args):
             my_anchors, train_numpy[i][2], g_boxes, 0.5)
 
         cat_classes = keras.utils.to_categorical(anchor_classes, 11)
-        if i < 10:
-            draw(img, my_anchors[cat_classes.argmax(axis=1) > 0] * SIDE_SIZE)
-        #draw(img, my_anchors[7+7*14:8+7*14] * side_size)
 
         all_bboxes.append(anchor_bboxes)
         all_cat_classes.append(cat_classes)
@@ -120,8 +120,7 @@ def main(args):
     all_bboxes = np.array(all_bboxes)
     all_sample_weights = np.array(all_sample_weights)
 
-    x_test = np.array([])
-    x_test = cv2.resize()
+    x_test = []
     for i in range(len(test_list)):
         x_test.append(cv2.resize(test_list[i], (SIDE_SIZE, SIDE_SIZE)))
     x_test = np.array(x_test)
