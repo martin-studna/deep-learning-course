@@ -1,43 +1,59 @@
 #!/usr/bin/env python3
+import tensorflow as tf
+import numpy as np
 import argparse
 import datetime
 import os
 import re
-os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by default
+# Report only TF errors by default
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
-import numpy as np
-import tensorflow as tf
 
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
-parser.add_argument("--clip_gradient", default=None, type=float, help="Norm for gradient clipping.")
-parser.add_argument("--hidden_layer", default=0, type=int, help="Additional hidden layer after RNN.")
+parser.add_argument("--clip_gradient", default=None,
+                    type=float, help="Norm for gradient clipping.")
+parser.add_argument("--hidden_layer", default=0, type=int,
+                    help="Additional hidden layer after RNN.")
 parser.add_argument("--epochs", default=20, type=int, help="Number of epochs.")
-parser.add_argument("--rnn_cell", default="LSTM", type=str, help="RNN cell type.")
-parser.add_argument("--rnn_cell_dim", default=10, type=int, help="RNN cell dimension.")
-parser.add_argument("--sequence_dim", default=1, type=int, help="Sequence element dimension.")
-parser.add_argument("--sequence_length", default=50, type=int, help="Sequence length.")
-parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
+parser.add_argument("--rnn_cell", default="LSTM",
+                    type=str, help="RNN cell type.")
+parser.add_argument("--rnn_cell_dim", default=10,
+                    type=int, help="RNN cell dimension.")
+parser.add_argument("--sequence_dim", default=1, type=int,
+                    help="Sequence element dimension.")
+parser.add_argument("--sequence_length", default=50,
+                    type=int, help="Sequence length.")
+parser.add_argument("--recodex", default=False,
+                    action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--test_sequences", default=1000, type=int, help="Number of testing sequences.")
-parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
-parser.add_argument("--train_sequences", default=10000, type=int, help="Number of training sequences.")
+parser.add_argument("--test_sequences", default=1000,
+                    type=int, help="Number of testing sequences.")
+parser.add_argument("--threads", default=1, type=int,
+                    help="Maximum number of threads to use.")
+parser.add_argument("--train_sequences", default=10000,
+                    type=int, help="Number of training sequences.")
 # If you add more arguments, ReCodEx will keep them with your default values.
 
 # Dataset for generating sequences, with labels predicting whether the cumulative sum
 # is odd/even.
+
+
 class Dataset:
     def __init__(self, sequences_num, sequence_length, sequence_dim, seed, shuffle_batches=True):
-        sequences = np.zeros([sequences_num, sequence_length, sequence_dim], np.int32)
+        sequences = np.zeros(
+            [sequences_num, sequence_length, sequence_dim], np.int32)
         labels = np.zeros([sequences_num, sequence_length, 1], np.bool)
         generator = np.random.RandomState(seed)
         for i in range(sequences_num):
-            sequences[i, :, 0] = generator.randint(0, max(2, sequence_dim), size=[sequence_length])
+            sequences[i, :, 0] = generator.randint(
+                0, max(2, sequence_dim), size=[sequence_length])
             labels[i, :, 0] = np.bitwise_and(np.cumsum(sequences[i, :, 0]), 1)
             if sequence_dim > 1:
                 sequences[i] = np.eye(sequence_dim)[sequences[i, :, 0]]
-        self._data = {"sequences": sequences.astype(np.float32), "labels": labels}
+        self._data = {"sequences": sequences.astype(
+            np.float32), "labels": labels}
         self._size = sequences_num
 
     @property
@@ -48,10 +64,12 @@ class Dataset:
     def size(self):
         return self._size
 
+
 class Network(tf.keras.Model):
     def __init__(self, args):
         # Construct the model.
-        sequences = tf.keras.layers.Input(shape=[args.sequence_length, args.sequence_dim])
+        sequences = tf.keras.layers.Input(
+            shape=[args.sequence_length, args.sequence_dim])
 
         # TODO: Process the sequence using a RNN with cell type `args.rnn_cell`
         # and with dimensionality `args.rnn_cell_dim`. Use `return_sequences=True`
@@ -68,6 +86,36 @@ class Network(tf.keras.Model):
         # TODO: Generate `predictions` using a fully connected layer
         # with one output and `tf.nn.sigmoid` activation.
 
+        model = tf.keras.Sequential()
+
+        model.add(sequences)
+
+        if args.rnn_cell == 'LSTM':
+            rnn = tf.keras.layers.LSTM(
+                args.rnn_cell_dim, return_sequences=True)
+        elif args.rnn_cell == 'SimpleRNN':
+            rnn = tf.keras.layers.SimpleRNNN(
+                args.rnn_cell_dim, return_sequences=True)
+        elif args.rnn_cell == 'GRU':
+            rnn = tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True)
+
+        model.add(rnn)
+        if args.hidden_layer > 0:
+            model.add(tf.keras.layers.Dense(
+                args.hidden_layer, activation='relu'))
+
+        model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
+
+        model.compile(
+            optimizer=tf.optimizers.Adam(),
+            loss=tf.losses.SparseCategoricalCrossentropy(),
+            metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
+        )
+
+        model.fit(args.train_sequences)
+
+        predictions = model.predict(args.test_sequences)
+
         super().__init__(inputs=sequences, outputs=predictions)
 
         self.compile(
@@ -76,7 +124,9 @@ class Network(tf.keras.Model):
             metrics=[tf.metrics.BinaryAccuracy("accuracy")],
         )
 
-        self.tb_callback=tf.keras.callbacks.TensorBoard(args.logdir, write_graph=False, profile_batch=0)
+        self.tb_callback = tf.keras.callbacks.TensorBoard(
+            args.logdir, write_graph=False, profile_batch=0)
+
 
 def main(args):
     # Fix random seeds and threads
@@ -85,20 +135,26 @@ def main(args):
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
     if args.recodex:
-        tf.keras.utils.get_custom_objects()["glorot_uniform"] = tf.initializers.GlorotUniform(seed=args.seed)
-        tf.keras.utils.get_custom_objects()["orthogonal"] = tf.initializers.Orthogonal(seed=args.seed)
-        tf.keras.utils.get_custom_objects()["uniform"] = tf.initializers.RandomUniform(seed=args.seed)
+        tf.keras.utils.get_custom_objects(
+        )["glorot_uniform"] = tf.initializers.GlorotUniform(seed=args.seed)
+        tf.keras.utils.get_custom_objects(
+        )["orthogonal"] = tf.initializers.Orthogonal(seed=args.seed)
+        tf.keras.utils.get_custom_objects(
+        )["uniform"] = tf.initializers.RandomUniform(seed=args.seed)
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
         os.path.basename(globals().get("__file__", "notebook")),
         datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
-        ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
+        ",".join(("{}={}".format(re.sub(
+            "(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
     ))
 
     # Create the data
-    train = Dataset(args.train_sequences, args.sequence_length, args.sequence_dim, seed=42, shuffle_batches=True)
-    test = Dataset(args.test_sequences, args.sequence_length, args.sequence_dim, seed=43, shuffle_batches=False)
+    train = Dataset(args.train_sequences, args.sequence_length,
+                    args.sequence_dim, seed=42, shuffle_batches=True)
+    test = Dataset(args.test_sequences, args.sequence_length,
+                   args.sequence_dim, seed=43, shuffle_batches=False)
 
     # Create the network and train
     network = Network(args)
@@ -111,6 +167,7 @@ def main(args):
 
     # Return test set accuracy for ReCodEx to validate
     return logs.history["val_accuracy"][-1]
+
 
 if __name__ == "__main__":
     args = parser.parse_args([] if "__file__" not in globals() else None)
