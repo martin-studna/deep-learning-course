@@ -97,7 +97,7 @@ class Network(tf.keras.Model):
 
         predictions = rnn(sequences)
         if args.hidden_layer > 0:
-            sequences = tf.keras.layers.Dense(
+            predictions = tf.keras.layers.Dense(
                 args.hidden_layer, activation='relu')(predictions)
 
         predictions = tf.keras.layers.Dense(
