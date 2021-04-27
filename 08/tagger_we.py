@@ -58,6 +58,11 @@ class Network(tf.keras.Model):
         elif args.rnn_cell == 'GRU':
             rnn = tf.keras.layers.GRU(args.rnn_cell_dim)
 
+        '''
+            It was mentioned on the practicals that, if you pass the rnn layer to the bidirectional layer, 
+            it is going to compute the forward pass and even the backward pass.
+            (Basically, you do not have to create two RNN layers.) 
+        '''
         predictions = tf.keras.layers.Bidirectional(
             rnn, merge_mode='sum')(predictions)
 
@@ -65,6 +70,10 @@ class Network(tf.keras.Model):
         # tags in the `word_mapping` of `train tags`. However, because we are applying the
         # the Dense layer to a ragged tensor, we need to wrap the Dense layer in
         # a tf.keras.layers.TimeDistributed.
+
+        '''
+            If the Ragged Tensor is used, you have to wrap the Dense layer with the TimeDistributed layer.
+        '''
 
         # output_layer = tf.keras.layers.Dense(train.word_mapping ,activation='softmax')
         # predictions = tf.keras.layers.TimeDistributed(
