@@ -90,7 +90,7 @@ class Network(tf.keras.Model):
             rnn = tf.keras.layers.LSTM(
                 args.rnn_cell_dim, return_sequences=True)
         elif args.rnn_cell == 'SimpleRNN':
-            rnn = tf.keras.layers.SimpleRNNN(
+            rnn = tf.keras.layers.SimpleRNN(
                 args.rnn_cell_dim, return_sequences=True)
         elif args.rnn_cell == 'GRU':
             rnn = tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True)
