@@ -61,7 +61,6 @@ class Network(tf.keras.Model):
         '''
             It was mentioned on the practicals that, if you pass the rnn layer to the bidirectional layer, 
             it is going to compute the forward pass and even the backward pass.
-            (Basically, you do not have to create two RNN layers.) 
         '''
         predictions = tf.keras.layers.Bidirectional(
             rnn, merge_mode='sum')(predictions)
