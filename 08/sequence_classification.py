@@ -86,10 +86,6 @@ class Network(tf.keras.Model):
         # TODO: Generate `predictions` using a fully connected layer
         # with one output and `tf.nn.sigmoid` activation.
 
-        model = tf.keras.Sequential()
-
-        model.add(sequences)
-
         if args.rnn_cell == 'LSTM':
             rnn = tf.keras.layers.LSTM(
                 args.rnn_cell_dim, return_sequences=True)
@@ -99,22 +95,12 @@ class Network(tf.keras.Model):
         elif args.rnn_cell == 'GRU':
             rnn = tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True)
 
-        model.add(rnn)
+        sequences = rnn(sequences)
         if args.hidden_layer > 0:
-            model.add(tf.keras.layers.Dense(
-                args.hidden_layer, activation='relu'))
+            sequences = tf.keras.layers.Dense(
+                args.hidden_layer, activation='relu')(sequences)
 
-        model.add(tf.keras.layers.Dense(1, activation='sigmoid'))
-
-        model.compile(
-            optimizer=tf.optimizers.Adam(),
-            loss=tf.losses.SparseCategoricalCrossentropy(),
-            metrics=[tf.metrics.SparseCategoricalAccuracy("accuracy")],
-        )
-
-        model.fit(args.train_sequences)
-
-        predictions = model.predict(args.test_sequences)
+        predictions = tf.keras.layers.Dense(1, activation='sigmoid')(sequences)
 
         super().__init__(inputs=sequences, outputs=predictions)
 
