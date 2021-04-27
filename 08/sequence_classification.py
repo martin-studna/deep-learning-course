@@ -95,12 +95,13 @@ class Network(tf.keras.Model):
         elif args.rnn_cell == 'GRU':
             rnn = tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True)
 
-        sequences = rnn(sequences)
+        predictions = rnn(sequences)
         if args.hidden_layer > 0:
             sequences = tf.keras.layers.Dense(
-                args.hidden_layer, activation='relu')(sequences)
+                args.hidden_layer, activation='relu')(predictions)
 
-        predictions = tf.keras.layers.Dense(1, activation='sigmoid')(sequences)
+        predictions = tf.keras.layers.Dense(
+            1, activation='sigmoid')(predictions)
 
         super().__init__(inputs=sequences, outputs=predictions)
 
