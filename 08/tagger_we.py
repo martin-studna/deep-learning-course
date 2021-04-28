@@ -45,7 +45,7 @@ class Network(tf.keras.Model):
         # provides a `vocab_size()` call returning the number of unique words in the mapping.
 
         predictions = tf.keras.layers.Embedding(
-            train.forms.word_mapping.vocab_size, args.we_dim)(predictions)
+            train.forms.word_mapping.vocab_size(), args.we_dim)(predictions)
 
         # TODO: Create the specified `args.rnn_cell` RNN cell (LSTM, GRU) with
         # dimension `args.rnn_cell_dim`. The cell should produce an output for every
@@ -54,9 +54,10 @@ class Network(tf.keras.Model):
 
         rnn = None
         if args.rnn_cell == 'LSTM':
-            rnn = tf.keras.layers.LSTM(args.rnn_cell_dim)
+            rnn = tf.keras.layers.LSTM(
+                args.rnn_cell_dim, return_sequences=True)
         elif args.rnn_cell == 'GRU':
-            rnn = tf.keras.layers.GRU(args.rnn_cell_dim)
+            rnn = tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True)
 
         '''
             It was mentioned on the practicals that, if you pass the rnn layer to the bidirectional layer, 
@@ -74,9 +75,10 @@ class Network(tf.keras.Model):
             If the Ragged Tensor is used, you have to wrap the Dense layer with the TimeDistributed layer.
         '''
 
-        # output_layer = tf.keras.layers.Dense(train.word_mapping ,activation='softmax')
-        # predictions = tf.keras.layers.TimeDistributed(
-        #     output_layer)(predictions)
+        output_layer = tf.keras.layers.Dense(
+            train.tags.word_mapping.vocab_size(), activation='softmax')
+        predictions = tf.keras.layers.TimeDistributed(
+            output_layer)(predictions)
 
         super().__init__(inputs=words, outputs=predictions)
         self.compile(optimizer=tf.optimizers.Adam(),
