@@ -9,6 +9,9 @@ import re
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
+# 2f67b427-a885-11e7-a937-00505601122b
+# c751264b-78ee-11eb-a1a9-005056ad4f31
+
 
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
@@ -147,7 +150,9 @@ def main(args):
     # - ragged tensor of integral tag ids as targets.
     # To create the identifiers, use the `word_mapping` of `morpho.train.tags`.
     def tagging_dataset(forms, lemmas, tags):
-        raise NotImplementedError()
+        tags = morpho.train.tags.word_mapping(tags)
+
+        return forms, tags
 
     train = morpho.train.dataset.map(tagging_dataset).apply(
         tf.data.experimental.dense_to_ragged_batch(args.batch_size))
