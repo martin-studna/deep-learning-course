@@ -44,6 +44,7 @@ class Network(tf.keras.Model):
         # TODO(tagger_we): Map strings in `words` to indices by using the `word_mapping` of `train.forms`.
 
         word_predictions = train.forms.word_mapping(words)
+        word_predictions = tf.cast(word_predictions, tf.float32)
 
         # TODO: With a probability of `args.word_masking`, replace the input word by an
         # unknown word (which has index 0).
@@ -57,7 +58,7 @@ class Network(tf.keras.Model):
         ones = tf.ones_like(word_predictions, dtype=tf.float32)
         dropout_outputs = tf.keras.layers.Dropout(rate=args.word_masking)(ones)
         word_predictions = tf.where(dropout_outputs == 0, tf.constant(
-            0, dtype=tf.int64), word_predictions)
+            0, dtype=tf.float32), word_predictions)
 
         # TODO(tagger_we): Embed input words with dimensionality `args.we_dim`. Note that the `word_mapping`
         # provides a `vocab_size()` call returning the number of unique words in the mapping.
@@ -104,12 +105,11 @@ class Network(tf.keras.Model):
         # TODO: Then, convert the flattened list into a RaggedTensor of the same shape
         # as `words` using `words.with_values` call.
 
-        word_predictions = word_predictions.with_values(
+        words = words.with_values(
             non_unique_words)
 
         # TODO: Concatenate the word-level embeddings and the computed character-level WEs
         # (in this order).
-
         predictions = tf.keras.layers.Concatenate()(
             [word_predictions, char_predictions])
 
