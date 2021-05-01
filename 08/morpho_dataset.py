@@ -56,7 +56,7 @@ class MorphoDataset:
             #counter = 0
             for line in data_file:
                 #counter += 1
-                #if counter > 1000:
+                #if counter > 10240:
                 #    break
 
                 line = line.decode("utf-8").rstrip("\r\n")
@@ -112,12 +112,13 @@ class MorphoDataset:
             print("Downloading dataset {}...".format(dataset), file=sys.stderr)
             urllib.request.urlretrieve("{}/{}".format(self._URL, path), filename=path)
 
+
         with zipfile.ZipFile(path, "r") as zip_file:
             for dataset in ["train", "dev", "test"]:
                 with zip_file.open("{}_{}.txt".format(os.path.splitext(path)[0], dataset), "r") as dataset_file:
                     setattr(self, dataset, self.Dataset(dataset_file,
                                                         train=self.train if dataset != "train" else None,
-                                                        max_sentences=max_sentences))
+                                                        max_sentences=max_sentences if dataset != "test" else None))
 
     # Evaluation infrastructure.
     @staticmethod

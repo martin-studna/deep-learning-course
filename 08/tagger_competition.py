@@ -8,6 +8,11 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by de
 # 2f67b427-a885-11e7-a937-00505601122b
 # c751264b-78ee-11eb-a1a9-005056ad4f31
 
+use_neptune = True
+if use_neptune:
+    import neptune
+    neptune.init(project_qualified_name='amdalifuk/tagger')
+
 import numpy as np
 import tensorflow as tf
 
@@ -16,15 +21,16 @@ from morpho_dataset import MorphoDataset
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=3, type=int, help="Number of epochs.")
+parser.add_argument("--batch_size", default=256*4, type=int, help="Batch size.")
+parser.add_argument("--learning_rate", default=0.01, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=128, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument("--threads", default=12, type=int, help="Maximum number of threads to use.")
 
 # These arguments will be set appropriately by ReCodEx, even if you change them.
-parser.add_argument("--cle_dim", default=32, type=int,
+parser.add_argument("--cle_dim", default=8, type=int,
                     help="CLE embedding dimension.")
-parser.add_argument("--max_sentences", default=5000, type=int,
+parser.add_argument("--max_sentences", default=2048, type=int,
                     help="Maximum number of sentences to load.")
 parser.add_argument("--recodex", default=False,
                     action="store_true", help="Evaluation in ReCodEx.")
@@ -32,9 +38,9 @@ parser.add_argument("--rnn_cell", default="LSTM",
                     type=str, help="RNN cell type.")
 parser.add_argument("--rnn_cell_dim", default=64,
                     type=int, help="RNN cell dimension.")
-parser.add_argument("--we_dim", default=64, type=int,
+parser.add_argument("--we_dim", default=128, type=int,
                     help="Word embedding dimension.")
-parser.add_argument("--word_masking", default=0.0, type=float,
+parser.add_argument("--word_masking", default=0.1, type=float,
                     help="Mask words with the given probability.")
 
 class Network(tf.keras.Model):
@@ -142,7 +148,7 @@ class Network(tf.keras.Model):
             output_layer)(predictions)
 
         super().__init__(inputs=words, outputs=predictions)
-        self.compile(optimizer=tf.optimizers.Adam(),
+        self.compile(optimizer=tf.optimizers.Adam(args.learning_rate),
                      loss=tf.losses.SparseCategoricalCrossentropy(),
                      metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")])
 
@@ -191,7 +197,7 @@ def main(args):
     ))
 
     # Load the data. Using analyses is only optional.
-    morpho = MorphoDataset("czech_pdt")
+    morpho = MorphoDataset("czech_pdt", args.max_sentences)
     analyses = MorphoAnalyzer("czech_pdt_analyses")
 
     #import pickle
@@ -216,20 +222,47 @@ def main(args):
     test = morpho.test.dataset.map(tagging_dataset).apply(
         tf.data.experimental.dense_to_ragged_batch(args.batch_size))
 
+    callbacks=[network.tb_callback]
 
-    network.fit(train, epochs=args.epochs, validation_data=dev,
-            callbacks=[network.tb_callback])
+    if use_neptune:       
+        neptune.create_experiment(params={
+            'batch_size': args.batch_size,
+            'cle_dim': args.cle_dim,
+            'epochs': args.epochs,
+            'learning_rate': args.learning_rate,
+            'max_sentences': args.max_sentences,
+            'rnn_cell': args.rnn_cell,
+            'rnn_cell_dim': args.rnn_cell_dim,
+            'seed': args.seed,
+            'threads': args.threads,
+            'we_dim': args.we_dim,
+            'word_masking': args.word_masking,
+        },abort_callback=lambda: neptune.stop() )
+        neptune.send_artifact('tagger_competition.py')
 
-    test_logs = network.evaluate(test, return_dict=True)
-    network.tb_callback.on_epoch_end(
-        args.epochs, {"val_test_" + metric: value for metric, value in test_logs.items()})
+        from tensorflow.keras.callbacks import Callback
+
+        class NeptuneCallback(Callback):
+            def on_epoch_end(self, epoch, logs=None):
+                #print(self.model.optimizer._decayed_lr(tf.float32) )
+                neptune.log_metric('loss', logs['loss'])
+                neptune.log_metric('1-accuracy', 1-logs['accuracy'])
+
+                if 'val_loss' in logs:
+                    neptune.log_metric('val_loss', logs['val_loss'])
+                    neptune.log_metric('1-val_accuracy', 1-logs['val_accuracy'])
+        callbacks.append(NeptuneCallback())
+    network.fit(train, epochs=args.epochs, validation_data=dev, callbacks=callbacks)
+
+    test_logs = network.evaluate(dev, return_dict=True)
+    network.tb_callback.on_epoch_end(args.epochs, {"val_test_" + metric: value for metric, value in test_logs.items()})
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
-    os.makedirs(args.logdir, exist_ok=True)
-    with open(os.path.join(args.logdir, "tagger_competition.txt"), "w", encoding="utf-8") as predictions_file:
+    #os.makedirs(args.logdir, exist_ok=True)
+    with open("tagger_competition.txt", "w", encoding="utf-8") as predictions_file:
         # TODO: Predict the tags on the test set; update the following prediction
         # command if you use other output structre than in tagger_we.
-        predictions = network.predict(test)
+        predictions = network.predict(test, batch_size=args.batch_size)
         tag_strings = morpho.test.tags.word_mapping.get_vocabulary()
         for sentence in predictions:
             for word in sentence:
