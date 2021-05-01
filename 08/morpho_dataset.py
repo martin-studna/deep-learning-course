@@ -52,7 +52,13 @@ class MorphoDataset:
             # Load the data
             self._size = 0
             in_sentence = False
+
+            #counter = 0
             for line in data_file:
+                #counter += 1
+                #if counter > 1000:
+                #    break
+
                 line = line.decode("utf-8").rstrip("\r\n")
                 if line:
                     if not in_sentence:
