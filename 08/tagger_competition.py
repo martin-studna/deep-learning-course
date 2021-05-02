@@ -15,32 +15,35 @@ if use_neptune:
 
 import numpy as np
 import tensorflow as tf
+from tensorflow import keras
 
+import tensorflow_addons as tfa
 from morpho_analyzer import MorphoAnalyzer
 from morpho_dataset import MorphoDataset
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=256*4, type=int, help="Batch size.")
-parser.add_argument("--learning_rate", default=0.01, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=128, type=int, help="Number of epochs.")
+parser.add_argument("--learning_rate", default=0.05, type=int, help="Batch size.") #0.2much, 0.01 same
+parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=12, type=int, help="Maximum number of threads to use.")
 
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--cle_dim", default=8, type=int,
                     help="CLE embedding dimension.")
-parser.add_argument("--max_sentences", default=2048, type=int,
+parser.add_argument("--max_sentences", default=2048*2, type=int, #8*2
                     help="Maximum number of sentences to load.")
 parser.add_argument("--recodex", default=False,
                     action="store_true", help="Evaluation in ReCodEx.")
-parser.add_argument("--rnn_cell", default="LSTM",
+parser.add_argument("--cosine_decay", default=True, help="use cosine_decay.")
+parser.add_argument("--rnn_cell", default="LSTM", #LSTM better
                     type=str, help="RNN cell type.")
-parser.add_argument("--rnn_cell_dim", default=64,
+parser.add_argument("--rnn_cell_dim", default=128, #32 low, 128 better
                     type=int, help="RNN cell dimension.")
-parser.add_argument("--we_dim", default=128, type=int,
+parser.add_argument("--we_dim", default=128+8*4, type=int, #64 too low, 256 little slower
                     help="Word embedding dimension.")
-parser.add_argument("--word_masking", default=0.1, type=float,
+parser.add_argument("--word_masking", default=0.1, type=float, #0.2 was much, 0 low
                     help="Mask words with the given probability.")
 
 class Network(tf.keras.Model):
@@ -52,7 +55,7 @@ class Network(tf.keras.Model):
 
         # TODO(tagger_we): Map strings in `words` to indices by using the `word_mapping` of `train.forms`.
 
-        word_predictions = train.forms.word_mapping(words)
+        word_predictions = train.forms.word_mapping(words)  ##FORMS
         word_predictions = tf.cast(word_predictions, tf.float32)
 
         # TODO: With a probability of `args.word_masking`, replace the input word by an
@@ -73,7 +76,7 @@ class Network(tf.keras.Model):
         # provides a `vocab_size()` call returning the number of unique words in the mapping.
 
         word_predictions = tf.keras.layers.Embedding(
-            train.forms.word_mapping.vocab_size(), args.we_dim)(word_predictions)
+            train.forms.word_mapping.vocab_size(), args.we_dim)(word_predictions) ##FORMS
 
         # TODO: Flatten a list of input words using `words.values` and pass
         # the flattened list through `tf.unique`, obtaining a list of
@@ -91,18 +94,18 @@ class Network(tf.keras.Model):
 
         # TODO: Map the letters into ids by using `char_mapping` of `train.forms`.
 
-        char_predictions = train.forms.char_mapping(char_predictions)
+        char_predictions = train.forms.char_mapping(char_predictions) ##FORMS
 
         # TODO: Embed the input characters with dimensionality `args.cle_dim`.
 
         char_predictions = tf.keras.layers.Embedding(
-            train.forms.word_mapping.vocab_size(), args.cle_dim)(char_predictions)
+            train.forms.word_mapping.vocab_size(), args.cle_dim)(char_predictions) ##FORMS
 
         # TODO: Pass the embedded letters through a bidirectional GRU layer
         # with dimensionality `args.cle_dim`, obtaining representations of the
         # whole words, **concatenating** the outputs of the forward and backward RNNs.
 
-        rnn = tf.keras.layers.GRU(args.cle_dim)
+        rnn = tf.keras.layers.GRU(args.cle_dim)#LSTM nepomue tady
         char_predictions = tf.keras.layers.Bidirectional(
             rnn, merge_mode='concat')(char_predictions)
 
@@ -137,6 +140,7 @@ class Network(tf.keras.Model):
         predictions = tf.keras.layers.Bidirectional(
             rnn, merge_mode='sum')(predictions)
 
+
         # TODO(tagge_we): Add a softmax classification layer into as many classes as there are unique
         # tags in the `word_mapping` of `train tags`. However, because we are applying the
         # the Dense layer to a ragged tensor, we need to wrap the Dense layer in
@@ -148,8 +152,15 @@ class Network(tf.keras.Model):
             output_layer)(predictions)
 
         super().__init__(inputs=words, outputs=predictions)
-        self.compile(optimizer=tf.optimizers.Adam(args.learning_rate),
-                     loss=tf.losses.SparseCategoricalCrossentropy(),
+        lr = args.learning_rate
+        print(f"train.size {train.size}")
+        if args.cosine_decay:
+            decay_steps = args.epochs * train.size / args.batch_size
+            lr = keras.experimental.CosineDecay(args.learning_rate, decay_steps, alpha=args.learning_rate/100)
+
+        self.compile(optimizer=tf.optimizers.Adam(lr),
+                     #loss=tfa.losses.SigmoidFocalCrossEntropy(reduction=tf.losses.Reduction.SUM_OVER_BATCH_SIZE),
+                     loss=keras.losses.SparseCategoricalCrossentropy(),
                      metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")])
 
         self.tb_callback = tf.keras.callbacks.TensorBoard(
@@ -207,21 +218,26 @@ def main(args):
     # Create the network and train
     network = Network(args, morpho.train)
 
+    #tf.data.experimental.enable_debug_mode()
+    #tf.config.run_functions_eagerly(True)
+
     # TODO(tagger_we): Construct dataset for training, which should contain pairs of
     # - ragged tensor of string words (forms) as input
     # - ragged tensor of integral tag ids as targets.
     # To create the identifiers, use the `word_mapping` of `morpho.train.tags`.
     def tagging_dataset(forms, lemmas, tags):
         tags = morpho.train.tags.word_mapping(tags)
+        #tags = keras.utils.to_categorical( tags  , morpho.train.tags.word_mapping.vocab_size() )
+        #keras.utils.to_categorical( morpho.train.tags.word_mapping( list(morpho.train.dataset.take(1))[0][2] ) , morpho.train.tags.word_mapping.vocab_size() )
         return forms, tags
 
     train = morpho.train.dataset.map(tagging_dataset).apply(
-        tf.data.experimental.dense_to_ragged_batch(args.batch_size))
+        tf.data.experimental.dense_to_ragged_batch(args.batch_size)).prefetch(tf.data.AUTOTUNE)
     dev = morpho.dev.dataset.map(tagging_dataset).apply(
-        tf.data.experimental.dense_to_ragged_batch(args.batch_size))
+        tf.data.experimental.dense_to_ragged_batch(args.batch_size)).prefetch(tf.data.AUTOTUNE)
     test = morpho.test.dataset.map(tagging_dataset).apply(
         tf.data.experimental.dense_to_ragged_batch(args.batch_size))
-
+        
     callbacks=[network.tb_callback]
 
     if use_neptune:       
@@ -237,6 +253,7 @@ def main(args):
             'threads': args.threads,
             'we_dim': args.we_dim,
             'word_masking': args.word_masking,
+            'cosine_decay': args.cosine_decay,
         },abort_callback=lambda: neptune.stop() )
         neptune.send_artifact('tagger_competition.py')
 
@@ -244,7 +261,7 @@ def main(args):
 
         class NeptuneCallback(Callback):
             def on_epoch_end(self, epoch, logs=None):
-                #print(self.model.optimizer._decayed_lr(tf.float32) )
+                print(self.model.optimizer._decayed_lr(tf.float32) )
                 neptune.log_metric('loss', logs['loss'])
                 neptune.log_metric('1-accuracy', 1-logs['accuracy'])
 
@@ -252,6 +269,10 @@ def main(args):
                     neptune.log_metric('val_loss', logs['val_loss'])
                     neptune.log_metric('1-val_accuracy', 1-logs['val_accuracy'])
         callbacks.append(NeptuneCallback())
+
+    network.summary()
+    keras.utils.plot_model(network, show_shapes=True)
+
     network.fit(train, epochs=args.epochs, validation_data=dev, callbacks=callbacks)
 
     test_logs = network.evaluate(dev, return_dict=True)
