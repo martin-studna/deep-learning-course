@@ -25,7 +25,7 @@ from morpho_dataset import MorphoDataset
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=int(512), type=int, help="Batch size.") #256 just a sip better
 parser.add_argument("--learning_rate", default=0.02, type=int, help="Batch size.") #0.2much, 0.01 same #0.1 bad 0.05 great
-parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=7, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=12, type=int, help="Maximum number of threads to use.")
 
@@ -45,9 +45,9 @@ parser.add_argument("--char_rnn_cell_dim", default=64,
                     type=int, help="RNN cell dimension.")
 parser.add_argument("--we_dim", default=256, type=int, #64 too low, 256 little slower
                     help="Word embedding dimension.")
-parser.add_argument("--word_masking", default=0.1, type=float, #0.2 was much, 0 low
+parser.add_argument("--word_masking", default=0.15, type=float, #0.2 was much, 0 low
                     help="Mask words with the given probability.")
-parser.add_argument("--char_masking", default=0.0, type=float, #0.2 was much, 0 low
+parser.add_argument("--char_masking", default=0.05, type=float, #0.2 was much, 0 low
                     help="Mask chars with the given probability.")
                     
 parser.add_argument("--concatenate", default='both', help="which to concatate: both, words, chars")
@@ -315,7 +315,7 @@ def main(args):
 
     test_logs = network.evaluate(dev, return_dict=True)
     network.tb_callback.on_epoch_end(args.epochs, {"val_test_" + metric: value for metric, value in test_logs.items()})
-
+    network.save(f'{datetime.datetime.now().strftime("%Y%m%d%H%M%S") }_{test_logs["accuracy"]:.2f}.h5')
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     #os.makedirs(args.logdir, exist_ok=True)
     with open("tagger_competition.txt", "w", encoding="utf-8") as predictions_file:
