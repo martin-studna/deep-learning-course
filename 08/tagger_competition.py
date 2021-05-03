@@ -23,28 +23,37 @@ from morpho_dataset import MorphoDataset
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=256*4, type=int, help="Batch size.")
-parser.add_argument("--learning_rate", default=0.05, type=int, help="Batch size.") #0.2much, 0.01 same
+parser.add_argument("--batch_size", default=int(512), type=int, help="Batch size.") #256 just a sip better
+parser.add_argument("--learning_rate", default=0.02, type=int, help="Batch size.") #0.2much, 0.01 same #0.1 bad 0.05 great
 parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=12, type=int, help="Maximum number of threads to use.")
 
 # These arguments will be set appropriately by ReCodEx, even if you change them.
-parser.add_argument("--cle_dim", default=8, type=int,
+parser.add_argument("--cle_dim", default=12, type=int,  #12 good,   6bad, 8ok, 16ok
                     help="CLE embedding dimension.")
 parser.add_argument("--max_sentences", default=2048*2, type=int, #8*2
                     help="Maximum number of sentences to load.")
 parser.add_argument("--recodex", default=False,
                     action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--cosine_decay", default=True, help="use cosine_decay.")
-parser.add_argument("--rnn_cell", default="LSTM", #LSTM better
+parser.add_argument("--rnn_cell", default="GRU", #LSTM better
                     type=str, help="RNN cell type.")
-parser.add_argument("--rnn_cell_dim", default=128, #32 low, 128 better
+parser.add_argument("--rnn_cell_dim", default=64, #32 low, 128 better
                     type=int, help="RNN cell dimension.")
-parser.add_argument("--we_dim", default=128+8*4, type=int, #64 too low, 256 little slower
+parser.add_argument("--char_rnn_cell_dim", default=64, 
+                    type=int, help="RNN cell dimension.")
+parser.add_argument("--we_dim", default=16, type=int, #64 too low, 256 little slower
                     help="Word embedding dimension.")
-parser.add_argument("--word_masking", default=0.1, type=float, #0.2 was much, 0 low
+parser.add_argument("--word_masking", default=0.0, type=float, #0.2 was much, 0 low
                     help="Mask words with the given probability.")
+parser.add_argument("--char_masking", default=0.05, type=float, #0.2 was much, 0 low
+                    help="Mask chars with the given probability.")
+                    
+parser.add_argument("--concatenate", default='both', help="which to concatate: both, words, chars")
+
+parser.add_argument("--clip_gradient", default=0.1,
+                    type=float, help="Norm for gradient clipping.")
 
 class Network(tf.keras.Model):
     def __init__(self, args, train):
@@ -75,8 +84,8 @@ class Network(tf.keras.Model):
         # TODO(tagger_we): Embed input words with dimensionality `args.we_dim`. Note that the `word_mapping`
         # provides a `vocab_size()` call returning the number of unique words in the mapping.
 
-        word_predictions = tf.keras.layers.Embedding(
-            train.forms.word_mapping.vocab_size(), args.we_dim)(word_predictions) ##FORMS
+        word_predictions = tf.keras.layers.Embedding( train.forms.word_mapping.vocab_size(), args.we_dim)(word_predictions) ##FORMS
+        #word wocab size 20037
 
         # TODO: Flatten a list of input words using `words.values` and pass
         # the flattened list through `tf.unique`, obtaining a list of
@@ -91,24 +100,28 @@ class Network(tf.keras.Model):
         # `tf.strings.unicode_split` call; use "UTF-8" as `input_encoding`.
 
         char_predictions = tf.strings.unicode_split(unique_words, "UTF-8")
-
         # TODO: Map the letters into ids by using `char_mapping` of `train.forms`.
 
         char_predictions = train.forms.char_mapping(char_predictions) ##FORMS
-
+        
+        char_predictions = tf.cast(char_predictions, tf.float32)
+        ones = tf.ones_like(char_predictions, dtype=tf.float32)
+        dropout_outputs = tf.keras.layers.Dropout(rate=args.char_masking)(ones)
+        char_predictions = tf.where(dropout_outputs == 0, tf.constant(
+            0, dtype=tf.float32), char_predictions)
         # TODO: Embed the input characters with dimensionality `args.cle_dim`.
 
         char_predictions = tf.keras.layers.Embedding(
-            train.forms.word_mapping.vocab_size(), args.cle_dim)(char_predictions) ##FORMS
+            train.forms.char_mapping.vocab_size(), args.cle_dim)(char_predictions) ##FORMS   #######char_mapping
+        #char vocab 119
 
         # TODO: Pass the embedded letters through a bidirectional GRU layer
         # with dimensionality `args.cle_dim`, obtaining representations of the
         # whole words, **concatenating** the outputs of the forward and backward RNNs.
 
-        rnn = tf.keras.layers.GRU(args.cle_dim)#LSTM nepomue tady
+        rnn = tf.keras.layers.GRU(args.char_rnn_cell_dim)#LSTM nepomue tady
         char_predictions = tf.keras.layers.Bidirectional(
             rnn, merge_mode='concat')(char_predictions)
-
         # TODO: Use `tf.gather` with the indices generated by `tf.unique` to create
         # representation of the flattened (non-unique) words.
 
@@ -122,14 +135,22 @@ class Network(tf.keras.Model):
 
         # TODO: Concatenate the word-level embeddings and the computed character-level WEs
         # (in this order).
-        predictions = tf.keras.layers.Concatenate()(
-            [word_predictions, char_predictions])
+        if args.concatenate == 'both':
+            predictions = tf.keras.layers.Concatenate()(
+                [word_predictions, char_predictions])
+        elif args.concatenate == 'words':
+            predictions = tf.keras.layers.Concatenate()(
+                [word_predictions])
+        elif args.concatenate == 'chars':
+            predictions = tf.keras.layers.Concatenate()(
+                [char_predictions])
+
 
         # TODO(tagger_we): Create the specified `args.rnn_cell` RNN cell (LSTM, GRU) with
         # dimension `args.rnn_cell_dim`. The cell should produce an output for every
         # sequence element. Then apply it in a bidirectional way on
         # the word representations, **summing** the outputs of forward and backward RNNs.
-
+        
         rnn = None
         if args.rnn_cell == 'LSTM':
             rnn = tf.keras.layers.LSTM(
@@ -146,6 +167,10 @@ class Network(tf.keras.Model):
         # the Dense layer to a ragged tensor, we need to wrap the Dense layer in
         # a tf.keras.layers.TimeDistributed.
 
+        output_layer = keras.layers.BatchNormalization()
+        predictions = tf.keras.layers.TimeDistributed(
+            output_layer)(predictions)
+
         output_layer = tf.keras.layers.Dense(
             train.tags.word_mapping.vocab_size(), activation='softmax')
         predictions = tf.keras.layers.TimeDistributed(
@@ -158,10 +183,10 @@ class Network(tf.keras.Model):
             decay_steps = args.epochs * train.size / args.batch_size
             lr = keras.experimental.CosineDecay(args.learning_rate, decay_steps, alpha=args.learning_rate/100)
 
-        self.compile(optimizer=tf.optimizers.Adam(lr),
-                     #loss=tfa.losses.SigmoidFocalCrossEntropy(reduction=tf.losses.Reduction.SUM_OVER_BATCH_SIZE),
-                     loss=keras.losses.SparseCategoricalCrossentropy(),
-                     metrics=[tf.metrics.SparseCategoricalAccuracy(name="accuracy")])
+        self.compile(optimizer=tf.optimizers.Adam(lr, global_clipnorm=args.clip_gradient),
+                     loss=tfa.losses.SigmoidFocalCrossEntropy(reduction=tf.losses.Reduction.SUM_OVER_BATCH_SIZE),
+                     #loss=keras.losses.CategoricalCrossentropy(),
+                     metrics=[tf.metrics.CategoricalAccuracy(name="accuracy")])
 
         self.tb_callback = tf.keras.callbacks.TensorBoard(
             args.logdir, update_freq=100, profile_batch=0)
@@ -227,12 +252,15 @@ def main(args):
     # To create the identifiers, use the `word_mapping` of `morpho.train.tags`.
     def tagging_dataset(forms, lemmas, tags):
         tags = morpho.train.tags.word_mapping(tags)
+        tags = tf.cast(tags, tf.int32)
+        num_classes = morpho.train.tags.word_mapping.vocab_size()
+        tags = tf.one_hot(tags, num_classes)
         #tags = keras.utils.to_categorical( tags  , morpho.train.tags.word_mapping.vocab_size() )
         #keras.utils.to_categorical( morpho.train.tags.word_mapping( list(morpho.train.dataset.take(1))[0][2] ) , morpho.train.tags.word_mapping.vocab_size() )
-        return forms, tags
+        return forms, lemmas, tags
 
     train = morpho.train.dataset.map(tagging_dataset).apply(
-        tf.data.experimental.dense_to_ragged_batch(args.batch_size)).prefetch(tf.data.AUTOTUNE)
+        tf.data.experimental.dense_to_ragged_batch(args.batch_size)).shuffle(2048*4).prefetch(tf.data.AUTOTUNE)
     dev = morpho.dev.dataset.map(tagging_dataset).apply(
         tf.data.experimental.dense_to_ragged_batch(args.batch_size)).prefetch(tf.data.AUTOTUNE)
     test = morpho.test.dataset.map(tagging_dataset).apply(
@@ -254,6 +282,9 @@ def main(args):
             'we_dim': args.we_dim,
             'word_masking': args.word_masking,
             'cosine_decay': args.cosine_decay,
+            'char_rnn_cell_dim': args.char_rnn_cell_dim,
+            'concatenate': args.concatenate,
+            'clip_gradient': args.clip_gradient,
         },abort_callback=lambda: neptune.stop() )
         neptune.send_artifact('tagger_competition.py')
 
