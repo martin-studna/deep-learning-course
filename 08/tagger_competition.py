@@ -24,7 +24,7 @@ from morpho_dataset import MorphoDataset
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=int(512), type=int, help="Batch size.") #256 just a sip better
-parser.add_argument("--learning_rate", default=0.02, type=int, help="Batch size.") #0.2much, 0.01 same #0.1 bad 0.05 great
+parser.add_argument("--learning_rate", default=0.005, type=int, help="Batch size.") #0.2much, 0.01 same #0.1 bad 0.05 great
 parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=12, type=int, help="Maximum number of threads to use.")
@@ -32,7 +32,7 @@ parser.add_argument("--threads", default=12, type=int, help="Maximum number of t
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--cle_dim", default=12, type=int,  #12 good,   6bad, 8ok, 16ok
                     help="CLE embedding dimension.")
-parser.add_argument("--max_sentences", default=2048*2, type=int, #8*2
+parser.add_argument("--max_sentences", default=100000, type=int, #8*2
                     help="Maximum number of sentences to load.")
 parser.add_argument("--recodex", default=False,
                     action="store_true", help="Evaluation in ReCodEx.")
@@ -45,7 +45,7 @@ parser.add_argument("--char_rnn_cell_dim", default=64,
                     type=int, help="RNN cell dimension.")
 parser.add_argument("--we_dim", default=16, type=int, #64 too low, 256 little slower
                     help="Word embedding dimension.")
-parser.add_argument("--word_masking", default=0.0, type=float, #0.2 was much, 0 low
+parser.add_argument("--word_masking", default=0.1, type=float, #0.2 was much, 0 low
                     help="Mask words with the given probability.")
 parser.add_argument("--char_masking", default=0.05, type=float, #0.2 was much, 0 low
                     help="Mask chars with the given probability.")
@@ -182,7 +182,7 @@ class Network(tf.keras.Model):
         # the Dense layer to a ragged tensor, we need to wrap the Dense layer in
         # a tf.keras.layers.TimeDistributed.
 
-        output_layer = keras.layers.BatchNormalization()
+        output_layer = keras.layers.LayerNormalization()
         predictions = tf.keras.layers.TimeDistributed(
             output_layer)(predictions)
 
