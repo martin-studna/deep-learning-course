@@ -25,7 +25,7 @@ from morpho_dataset import MorphoDataset
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=int(512), type=int, help="Batch size.") #256 just a sip better
 parser.add_argument("--learning_rate", default=0.01, type=int, help="Batch size.") #0.2much, 0.01 same #0.1 bad 0.05 great
-parser.add_argument("--epochs", default=12, type=int, help="Number of epochs.")
+parser.add_argument("--epochs", default=14, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=12, type=int, help="Maximum number of threads to use.")
 
@@ -39,15 +39,15 @@ parser.add_argument("--recodex", default=False,
 parser.add_argument("--cosine_decay", default=True, help="use cosine_decay.")
 parser.add_argument("--rnn_cell", default="GRU", #LSTM better
                     type=str, help="RNN cell type.")
-parser.add_argument("--rnn_cell_dim", default=64, #32 low, 128 better
+parser.add_argument("--rnn_cell_dim", default=128, #32 low, 128 better
                     type=int, help="RNN cell dimension.")
-parser.add_argument("--char_rnn_cell_dim", default=64, 
+parser.add_argument("--char_rnn_cell_dim", default=128, 
                     type=int, help="RNN cell dimension.")
-parser.add_argument("--we_dim", default=256, type=int, #64 too low, 256 little slower
+parser.add_argument("--we_dim", default=320, type=int, #64 too low, 256 little slower
                     help="Word embedding dimension.")
-parser.add_argument("--word_masking", default=0.2, type=float, #0.2 was much, 0 low
+parser.add_argument("--word_masking", default=0.15, type=float, #0.2 was much, 0 low
                     help="Mask words with the given probability.")
-parser.add_argument("--char_masking", default=0.1, type=float, #0.2 was much, 0 low
+parser.add_argument("--char_masking", default=0.08, type=float, #0.2 was much, 0 low
                     help="Mask chars with the given probability.")
                     
 parser.add_argument("--concatenate", default='both', help="which to concatate: both, words, chars")
