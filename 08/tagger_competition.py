@@ -60,12 +60,17 @@ class Network(tf.keras.Model):
         # Implement a one-layer RNN network. The input `words` is
         # a RaggedTensor of strings, each batch example being a list of words.
         words = tf.keras.layers.Input(
-            shape=[None], dtype=tf.string, ragged=True)
+            shape=[None], dtype=tf.string, ragged=True, name='a')
 
+        words2 = tf.keras.layers.Input(
+                    shape=[None], dtype=tf.string, ragged=True, name='b')
         # TODO(tagger_we): Map strings in `words` to indices by using the `word_mapping` of `train.forms`.
 
         word_predictions = train.forms.word_mapping(words)  ##FORMS
         word_predictions = tf.cast(word_predictions, tf.float32)
+
+        word_predictions2 = train.forms.word_mapping(words2)  ##FORMS
+        word_predictions2 = tf.cast(word_predictions2, tf.float32)
 
         # TODO: With a probability of `args.word_masking`, replace the input word by an
         # unknown word (which has index 0).
@@ -81,10 +86,16 @@ class Network(tf.keras.Model):
         word_predictions = tf.where(dropout_outputs == 0, tf.constant(
             0, dtype=tf.float32), word_predictions)
 
+        ones = tf.ones_like(word_predictions2, dtype=tf.float32)
+        dropout_outputs = tf.keras.layers.Dropout(rate=args.word_masking)(ones)
+        word_predictions2 = tf.where(dropout_outputs == 0, tf.constant(
+            0, dtype=tf.float32), word_predictions2)
+
         # TODO(tagger_we): Embed input words with dimensionality `args.we_dim`. Note that the `word_mapping`
         # provides a `vocab_size()` call returning the number of unique words in the mapping.
 
         word_predictions = tf.keras.layers.Embedding( train.forms.word_mapping.vocab_size(), args.we_dim)(word_predictions) ##FORMS
+        word_predictions2 = tf.keras.layers.Embedding( train.forms.word_mapping.vocab_size(), args.we_dim)(word_predictions2) ##FORMS
         #word wocab size 20037
 
         # TODO: Flatten a list of input words using `words.values` and pass
@@ -95,6 +106,10 @@ class Network(tf.keras.Model):
         flattened_words = tf.reshape(words.values, [-1])
         unique_words, unique_word_idx = tf.unique(
             flattened_words)
+
+        flattened_words2 = tf.reshape(words2.values, [-1])
+        unique_words2, unique_word_idx2 = tf.unique(
+            flattened_words2)
 
         # TODO: Create sequences of letters by passing the unique words through
         # `tf.strings.unicode_split` call; use "UTF-8" as `input_encoding`.
@@ -137,7 +152,7 @@ class Network(tf.keras.Model):
         # (in this order).
         if args.concatenate == 'both':
             predictions = tf.keras.layers.Concatenate()(
-                [word_predictions, char_predictions])
+                [word_predictions, word_predictions2, char_predictions])
         elif args.concatenate == 'words':
             predictions = tf.keras.layers.Concatenate()(
                 [word_predictions])
@@ -176,7 +191,7 @@ class Network(tf.keras.Model):
         predictions = tf.keras.layers.TimeDistributed(
             output_layer)(predictions)
 
-        super().__init__(inputs=words, outputs=predictions)
+        super().__init__(inputs=[words, words2], outputs=predictions)
         lr = args.learning_rate
         print(f"train.size {train.size}")
         if args.cosine_decay:
@@ -198,9 +213,9 @@ class Network(tf.keras.Model):
     # to support it, passing the "flattened" predictions and gold data to the loss
     # and metrics.
     def train_step(self, data):
-        x, y = data
+        x, z, y = data
         with tf.GradientTape() as tape:
-            y_pred = self(x, training=True)
+            y_pred = self({'a':x, 'b':z}, training=True)
             loss = self.compiled_loss(
                 y.values, y_pred.values, regularization_losses=self.losses)
         self.optimizer.minimize(loss, self.trainable_variables, tape=tape)
@@ -209,8 +224,8 @@ class Network(tf.keras.Model):
 
     # Analogously to `train_step`, we also need to override `test_step`.
     def test_step(self, data):
-        x, y = data
-        y_pred = self(x, training=False)
+        x, z, y = data
+        y_pred = self({'a':x, 'b':z}, training=False)
         loss = self.compiled_loss(
             y.values, y_pred.values, regularization_losses=self.losses)
         self.compiled_metrics.update_state(y.values, y_pred.values)
