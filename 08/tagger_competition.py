@@ -24,7 +24,7 @@ from morpho_dataset import MorphoDataset
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=int(512), type=int, help="Batch size.") #256 just a sip better
-parser.add_argument("--learning_rate", default=0.005, type=int, help="Batch size.") #0.2much, 0.01 same #0.1 bad 0.05 great
+parser.add_argument("--learning_rate", default=0.02, type=int, help="Batch size.") #0.2much, 0.01 same #0.1 bad 0.05 great
 parser.add_argument("--epochs", default=30, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=12, type=int, help="Maximum number of threads to use.")
@@ -43,17 +43,19 @@ parser.add_argument("--rnn_cell_dim", default=64, #32 low, 128 better
                     type=int, help="RNN cell dimension.")
 parser.add_argument("--char_rnn_cell_dim", default=64, 
                     type=int, help="RNN cell dimension.")
-parser.add_argument("--we_dim", default=16, type=int, #64 too low, 256 little slower
+parser.add_argument("--we_dim", default=256, type=int, #64 too low, 256 little slower
                     help="Word embedding dimension.")
 parser.add_argument("--word_masking", default=0.1, type=float, #0.2 was much, 0 low
                     help="Mask words with the given probability.")
-parser.add_argument("--char_masking", default=0.05, type=float, #0.2 was much, 0 low
+parser.add_argument("--char_masking", default=0.0, type=float, #0.2 was much, 0 low
                     help="Mask chars with the given probability.")
                     
 parser.add_argument("--concatenate", default='both', help="which to concatate: both, words, chars")
 
 parser.add_argument("--clip_gradient", default=0.1,
                     type=float, help="Norm for gradient clipping.")
+parser.add_argument("--recurrent_dropout", default=0,
+                    type=float, help="recurrent_dropout.")
 
 class Network(tf.keras.Model):
     def __init__(self, args, train):
@@ -62,15 +64,11 @@ class Network(tf.keras.Model):
         words = tf.keras.layers.Input(
             shape=[None], dtype=tf.string, ragged=True, name='a')
 
-        words2 = tf.keras.layers.Input(
-                    shape=[None], dtype=tf.string, ragged=True, name='b')
         # TODO(tagger_we): Map strings in `words` to indices by using the `word_mapping` of `train.forms`.
 
         word_predictions = train.forms.word_mapping(words)  ##FORMS
         word_predictions = tf.cast(word_predictions, tf.float32)
 
-        word_predictions2 = train.forms.word_mapping(words2)  ##FORMS
-        word_predictions2 = tf.cast(word_predictions2, tf.float32)
 
         # TODO: With a probability of `args.word_masking`, replace the input word by an
         # unknown word (which has index 0).
@@ -86,16 +84,11 @@ class Network(tf.keras.Model):
         word_predictions = tf.where(dropout_outputs == 0, tf.constant(
             0, dtype=tf.float32), word_predictions)
 
-        ones = tf.ones_like(word_predictions2, dtype=tf.float32)
-        dropout_outputs = tf.keras.layers.Dropout(rate=args.word_masking)(ones)
-        word_predictions2 = tf.where(dropout_outputs == 0, tf.constant(
-            0, dtype=tf.float32), word_predictions2)
 
         # TODO(tagger_we): Embed input words with dimensionality `args.we_dim`. Note that the `word_mapping`
         # provides a `vocab_size()` call returning the number of unique words in the mapping.
 
         word_predictions = tf.keras.layers.Embedding( train.forms.word_mapping.vocab_size(), args.we_dim)(word_predictions) ##FORMS
-        word_predictions2 = tf.keras.layers.Embedding( train.forms.word_mapping.vocab_size(), args.we_dim)(word_predictions2) ##FORMS
         #word wocab size 20037
 
         # TODO: Flatten a list of input words using `words.values` and pass
@@ -107,9 +100,6 @@ class Network(tf.keras.Model):
         unique_words, unique_word_idx = tf.unique(
             flattened_words)
 
-        flattened_words2 = tf.reshape(words2.values, [-1])
-        unique_words2, unique_word_idx2 = tf.unique(
-            flattened_words2)
 
         # TODO: Create sequences of letters by passing the unique words through
         # `tf.strings.unicode_split` call; use "UTF-8" as `input_encoding`.
@@ -152,7 +142,7 @@ class Network(tf.keras.Model):
         # (in this order).
         if args.concatenate == 'both':
             predictions = tf.keras.layers.Concatenate()(
-                [word_predictions, word_predictions2, char_predictions])
+                [word_predictions, char_predictions])
         elif args.concatenate == 'words':
             predictions = tf.keras.layers.Concatenate()(
                 [word_predictions])
@@ -169,9 +159,10 @@ class Network(tf.keras.Model):
         rnn = None
         if args.rnn_cell == 'LSTM':
             rnn = tf.keras.layers.LSTM(
-                args.rnn_cell_dim, return_sequences=True)
+                args.rnn_cell_dim, return_sequences=True, recurrent_dropout=args.recurrent_dropout)
         elif args.rnn_cell == 'GRU':
-            rnn = tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True)
+            rnn = tf.keras.layers.GRU(args.rnn_cell_dim, return_sequences=True,recurrent_dropout=args.recurrent_dropout)
+
 
         predictions = tf.keras.layers.Bidirectional(
             rnn, merge_mode='sum')(predictions)
@@ -191,7 +182,7 @@ class Network(tf.keras.Model):
         predictions = tf.keras.layers.TimeDistributed(
             output_layer)(predictions)
 
-        super().__init__(inputs=[words, words2], outputs=predictions)
+        super().__init__(inputs=words, outputs=predictions)
         lr = args.learning_rate
         print(f"train.size {train.size}")
         if args.cosine_decay:
@@ -213,9 +204,9 @@ class Network(tf.keras.Model):
     # to support it, passing the "flattened" predictions and gold data to the loss
     # and metrics.
     def train_step(self, data):
-        x, z, y = data
+        x, y = data
         with tf.GradientTape() as tape:
-            y_pred = self({'a':x, 'b':z}, training=True)
+            y_pred = self(x, training=True)
             loss = self.compiled_loss(
                 y.values, y_pred.values, regularization_losses=self.losses)
         self.optimizer.minimize(loss, self.trainable_variables, tape=tape)
@@ -224,8 +215,8 @@ class Network(tf.keras.Model):
 
     # Analogously to `train_step`, we also need to override `test_step`.
     def test_step(self, data):
-        x, z, y = data
-        y_pred = self({'a':x, 'b':z}, training=False)
+        x, y = data
+        y_pred = self(x, training=False)
         loss = self.compiled_loss(
             y.values, y_pred.values, regularization_losses=self.losses)
         self.compiled_metrics.update_state(y.values, y_pred.values)
@@ -272,7 +263,7 @@ def main(args):
         tags = tf.one_hot(tags, num_classes)
         #tags = keras.utils.to_categorical( tags  , morpho.train.tags.word_mapping.vocab_size() )
         #keras.utils.to_categorical( morpho.train.tags.word_mapping( list(morpho.train.dataset.take(1))[0][2] ) , morpho.train.tags.word_mapping.vocab_size() )
-        return forms, lemmas, tags
+        return forms, tags
 
     train = morpho.train.dataset.map(tagging_dataset).apply(
         tf.data.experimental.dense_to_ragged_batch(args.batch_size)).shuffle(2048*4).prefetch(tf.data.AUTOTUNE)
@@ -300,6 +291,7 @@ def main(args):
             'char_rnn_cell_dim': args.char_rnn_cell_dim,
             'concatenate': args.concatenate,
             'clip_gradient': args.clip_gradient,
+            'recurrent_dropout': args.recurrent_dropout,
         },abort_callback=lambda: neptune.stop() )
         neptune.send_artifact('tagger_competition.py')
 
