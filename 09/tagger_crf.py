@@ -109,7 +109,7 @@ class Network(tf.keras.Model):
         likelihood = tfa.text.crf_log_likelihood(inputs=logits.to_tensor(), tag_indices=gold_labels.to_tensor(
         ), sequence_lengths=gold_labels.row_lengths(), transition_params=self._crf_weights)
 
-        loss = tf.reduce_mean(likelihood[0])
+        loss = tf.reduce_mean(- likelihood[0])
 
         return loss
 
