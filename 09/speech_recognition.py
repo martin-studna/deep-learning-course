@@ -143,7 +143,7 @@ def main(args):
             #   - split it to unicode characters by using `tf.strings.unicode_split`
             #   - then pass it through the `cvcs.letters_mapping` layer to map
             #     the unicode characters to ids
-            return (example["mfccs"], cvcs.letters_mapping( tf.strings.unicode_split( example["sentence"], 'UTF-8' )))
+            return example["mfccs"], cvcs.letters_mapping( tf.strings.unicode_split( example["sentence"], 'UTF-8' ))
 
 
         dataset = getattr(cvcs, name).map(prepare_example)
