@@ -16,6 +16,7 @@ parser.add_argument("--batch_size", default=None, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=None, type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
+parser.add_argument("--rnn_cell_dim", default=32, type=int, help="rnn_cell_dim")
 
 class Network(tf.keras.Model):
     def __init__(self, args):
@@ -38,13 +39,19 @@ class Network(tf.keras.Model):
         #   outputs (the plus one is for the CTC blank symbol). Note that no
         #   activation should be used (the CTC operations will take care of it).
         #   Do not forget to use `tf.keras.layers.TimeDistributed`.
-        logits = ...
+        rnn = tf.keras.layers.LSTM(args.rnn_cell_dim, return_sequences=True)
+        predictions = tf.keras.layers.Bidirectional(
+            rnn, merge_mode='sum')(inputs)
+
+        output_layer = tf.keras.layers.Dense( logits.row_lengths() )
+        predictions = tf.keras.layers.TimeDistributed(  output_layer)(predictions)
+        logits = predictions
 
         super().__init__(inputs=inputs, outputs=logits)
 
         # We compile the model without loss, because `train_step` will directly call
         # the `selt.ctc_loss` method.
-        self.compile(optimizer=...,
+        self.compile(optimizer=tf.optimizers.Adam(),
                      metrics=[CommonVoiceCs.EditDistanceMetric()])
 
         self.tb_callback = tf.keras.callbacks.TensorBoard(args.logdir, update_freq=100, profile_batch=0)
@@ -63,7 +70,9 @@ class Network(tf.keras.Model):
         #
         # The `tc.nn.ctc_loss` returns a value for a single batch example, so average
         # them to produce a single value and return it.
-        raise NotImplementedError()
+        
+        single_batch_result = tf.nn.ctc_loss(  gold_labels.to_sparse(None), logits.to_tensor( logits_time_major=False  ), gold_labels.row_lengths(), logits.row_lengths(), NEVÍÍÍÍM )
+        return tf.reduce_mean(-single_batch_result)
 
     def ctc_decode(self, logits):
         assert isinstance(logits, tf.RaggedTensor), "Logits given to CTC predict must be RaggedTensors"
@@ -74,7 +83,10 @@ class Network(tf.keras.Model):
         #   to shape `[max_audio_length, batch, dim]` using `tf.transpose`
         # - Use `logits.row_lengths()` method to obtain the `sequence_length`
         # - Convert the result of the decoded from a SparseTensor to a RaggedTensor
-        predictions = ...
+        predictions = tf.nn.ctc_beam_search_decoder( tf.transpose( logits.to_tensor()  ,  [max_audio_length, batch, dim]   ),logits.row_lengths() )
+
+        predictions = tf.RaggedTensor.from_tensor(
+            predictions, lengths=predictions.row_lengths())
 
         assert isinstance(predictions, tf.RaggedTensor), "CTC predictions must be RaggedTensors"
         return predictions
@@ -132,7 +144,8 @@ def main(args):
             #   - split it to unicode characters by using `tf.strings.unicode_split`
             #   - then pass it through the `cvcs.letters_mapping` layer to map
             #     the unicode characters to ids
-            raise NotImplementedError()
+            return (example["mfccs"], cvcs.letters_mapping( tf.strings.unicode_split( example["sentence"] )))
+
 
         dataset = getattr(cvcs, name).map(prepare_example)
         dataset = dataset.shuffle(len(dataset), seed=args.seed) if name == "train" else dataset
@@ -142,7 +155,7 @@ def main(args):
     train, dev, test = create_dataset("train"), create_dataset("dev"), create_dataset("test")
 
     # TODO: Create the model and train it
-    model = ...
+    model = Network(args)
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
