@@ -43,7 +43,7 @@ class Network(tf.keras.Model):
         predictions = tf.keras.layers.Bidirectional(
             rnn, merge_mode='sum')(inputs)
 
-        output_layer = tf.keras.layers.Dense( logits.row_lengths() )
+        output_layer = tf.keras.layers.Dense( 1 + len(CommonVoiceCs.LETTERS) )
         predictions = tf.keras.layers.TimeDistributed(  output_layer)(predictions)
         logits = predictions
 
@@ -71,7 +71,7 @@ class Network(tf.keras.Model):
         # The `tc.nn.ctc_loss` returns a value for a single batch example, so average
         # them to produce a single value and return it.
         
-        single_batch_result = tf.nn.ctc_loss(  gold_labels.to_sparse(None), logits.to_tensor( logits_time_major=False  ), gold_labels.row_lengths(), logits.row_lengths(), NEVÍÍÍÍM )
+        single_batch_result = tf.nn.ctc_loss(  gold_labels.to_sparse(None), logits.to_tensor( logits_time_major=False  ), gold_labels.row_lengths(), logits.row_lengths(), len(CommonVoiceCs.LETTERS) )
         return tf.reduce_mean(-single_batch_result)
 
     def ctc_decode(self, logits):
