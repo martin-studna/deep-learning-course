@@ -85,8 +85,7 @@ class Network(tf.keras.Model):
         # - Convert the result of the decoded from a SparseTensor to a RaggedTensor
         predictions = tf.nn.ctc_beam_search_decoder( tf.transpose( logits.to_tensor()  ,  [max_audio_length, batch, dim]   ),logits.row_lengths() )
 
-        predictions = tf.RaggedTensor.from_tensor(
-            predictions, lengths=predictions.row_lengths())
+        predictions = tf.RaggedTensor.from_tensor(predictions, lengths=predictions.row_lengths())
 
         assert isinstance(predictions, tf.RaggedTensor), "CTC predictions must be RaggedTensors"
         return predictions
@@ -144,7 +143,7 @@ def main(args):
             #   - split it to unicode characters by using `tf.strings.unicode_split`
             #   - then pass it through the `cvcs.letters_mapping` layer to map
             #     the unicode characters to ids
-            return (example["mfccs"], cvcs.letters_mapping( tf.strings.unicode_split( example["sentence"] )))
+            return (example["mfccs"], cvcs.letters_mapping( tf.strings.unicode_split( example["sentence"], 'UTF-8' )))
 
 
         dataset = getattr(cvcs, name).map(prepare_example)
