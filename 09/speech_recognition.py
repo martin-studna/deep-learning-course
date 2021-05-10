@@ -83,9 +83,9 @@ class Network(tf.keras.Model):
         #   to shape `[max_audio_length, batch, dim]` using `tf.transpose`
         # - Use `logits.row_lengths()` method to obtain the `sequence_length`
         # - Convert the result of the decoded from a SparseTensor to a RaggedTensor
-        predictions = tf.nn.ctc_beam_search_decoder( tf.transpose( logits.to_tensor()  ,  [max_audio_length, batch, dim]   ),logits.row_lengths() )
+        beams, _ = tf.nn.ctc_beam_search_decoder( tf.transpose( logits.to_tensor()  ,  [1,0,2]   ),logits.row_lengths() )
 
-        predictions = tf.RaggedTensor.from_tensor(predictions, lengths=predictions.row_lengths())
+        predictions = tf.RaggedTensor.from_sparse(beams[0])
 
         assert isinstance(predictions, tf.RaggedTensor), "CTC predictions must be RaggedTensors"
         return predictions
