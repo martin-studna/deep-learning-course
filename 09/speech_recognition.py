@@ -100,7 +100,7 @@ class Network(tf.keras.Model):
         # The `tc.nn.ctc_loss` returns a value for a single batch example, so average
         # them to produce a single value and return it.
         single_batch_result = tf.nn.ctc_loss(tf.cast(gold_labels.to_sparse(), dtype=tf.int32), tf.cast(logits.to_tensor(
-        ), dtype=tf.float32), None, tf.cast(logits.row_lengths(), dtype=tf.int32), logits_time_major=False, blank_index=0)
+        ), dtype=tf.float32), None, tf.cast(logits.row_lengths(), dtype=tf.int32), logits_time_major=False, blank_index=len(CommonVoiceCs.LETTERS))
 
         return tf.reduce_mean(single_batch_result)
 
