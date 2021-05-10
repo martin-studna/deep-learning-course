@@ -59,7 +59,7 @@ class Network(tf.keras.Model):
 
         # We compile the model without loss, because `train_step` will directly call
         # the `selt.ctc_loss` method.
-        self.compile(optimizer=tf.optimizers.Adam(), run_eagerly=True,
+        self.compile(optimizer=tf.optimizers.Adam(),
                      metrics=[CommonVoiceCs.EditDistanceMetric()])
 
         self.tb_callback = tf.keras.callbacks.TensorBoard(
@@ -82,8 +82,8 @@ class Network(tf.keras.Model):
         #
         # The `tc.nn.ctc_loss` returns a value for a single batch example, so average
         # them to produce a single value and return it.
-        single_batch_result = tf.nn.ctc_loss(gold_labels.to_sparse(), logits.to_tensor(
-        ), None, logits.row_lengths(), logits_time_major=False, blank_index=gold_labels[-1])
+        single_batch_result = tf.nn.ctc_loss(tf.cast(gold_labels.to_sparse(), dtype=tf.int32), tf.cast(logits.to_tensor(
+        ), dtype=tf.float32), None, tf.cast(logits.row_lengths(), dtype=tf.int32), logits_time_major=False, blank_index=(len(CommonVoiceCs.LETTERS) - 1))
 
         return tf.reduce_mean(single_batch_result)
 
@@ -97,11 +97,10 @@ class Network(tf.keras.Model):
         #   to shape `[max_audio_length, batch, dim]` using `tf.transpose`
         # - Use `logits.row_lengths()` method to obtain the `sequence_length`
         # - Convert the result of the decoded from a SparseTensor to a RaggedTensor
-        predictions = tf.nn.ctc_beam_search_decoder(tf.transpose(
-            logits.to_tensor(),  [max_audio_length, batch, dim]), logits.row_lengths())
+        beams, _ = tf.nn.ctc_beam_search_decoder(tf.transpose(
+            logits.to_tensor(), [1, 0, 2]), logits.row_lengths())
 
-        predictions = tf.RaggedTensor.from_tensor(
-            predictions, lengths=predictions.row_lengths())
+        predictions = tf.RaggedTensor.from_sparse(beams[0])
 
         assert isinstance(
             predictions, tf.RaggedTensor), "CTC predictions must be RaggedTensors"
