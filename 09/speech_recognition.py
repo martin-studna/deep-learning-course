@@ -184,6 +184,10 @@ def main(args):
             'rnn_cell_dim': args.rnn_cell_dim,
             'seed': args.seed,
             'threads': args.threads,
+            'dropout': args.dropout,
+            'learning_rate': args.learning_rate,
+            'clip_gradient': args.clip_gradient,
+            'hidden_layers': args.hidden_layers
         }, abort_callback=lambda: neptune.stop())
         neptune.send_artifact('speech_recognition.py')
 
