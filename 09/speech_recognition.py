@@ -13,8 +13,8 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=5,
+parser.add_argument("--batch_size", default=256, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=2,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=16, type=int,
@@ -24,21 +24,21 @@ parser.add_argument("--rnn_cell_dim", default=32,
 parser.add_argument("--ctc_beam", default=12,
                     type=int, help="ctc beam")
 
-use_neptune = False
+use_neptune = True
 if use_neptune:
     import neptune
-    neptune.init(project_qualified_name='amdalifuk/tagger')
+    neptune.init(project_qualified_name='martin.studna/speech-recognition')
 
 
 class NeptuneCallback(Callback):
     def on_epoch_end(self, epoch, logs=None):
         print(self.model.optimizer._decayed_lr(tf.float32))
         neptune.log_metric('loss', logs['loss'])
-        neptune.log_metric('1-accuracy', 1-logs['accuracy'])
+        #neptune.log_metric('1-accuracy', 1-logs['accuracy'])
 
-        if 'val_loss' in logs:
-            neptune.log_metric('val_loss', logs['val_loss'])
-            neptune.log_metric('1-val_accuracy', 1-logs['val_accuracy'])
+        if 'val_edit_distance' in logs:
+            neptune.log_metric('val_edit_distance', logs['val_edit_distance'])
+            #neptune.log_metric('1-val_accuracy', 1-logs['val_accuracy'])
 
 
 class Network(tf.keras.Model):
@@ -204,7 +204,8 @@ def main(args):
     # TODO: Create the model and train it
     model = Network(args)
 
-    model.fit(train, epochs=args.epochs, validation_data=dev)
+    model.fit(train, epochs=args.epochs, validation_data=dev,
+              callbacks=[NeptuneCallback()])
 
     # Generate test set annotations, but in args.logdir to allow parallel execution.
     os.makedirs(args.logdir, exist_ok=True)
