@@ -98,7 +98,7 @@ class Network(tf.keras.Model):
         # - Use `logits.row_lengths()` method to obtain the `sequence_length`
         # - Convert the result of the decoded from a SparseTensor to a RaggedTensor
         beams, _ = tf.nn.ctc_beam_search_decoder(tf.transpose(
-            logits.to_tensor(), [1, 0, 2]), logits.row_lengths())
+            logits.to_tensor(), [1, 0, 2]), tf.cast(logits.row_lengths(), dtype=tf.int32))
 
         predictions = tf.RaggedTensor.from_sparse(beams[0])
 
@@ -183,7 +183,7 @@ def main(args):
     os.makedirs(args.logdir, exist_ok=True)
     with open(os.path.join(args.logdir, "speech_recognition.txt"), "w", encoding="utf-8") as predictions_file:
         # TODO: Predict the CommonVoice sentences.
-        predictions = ...
+        predictions = model.predict(test, batch_size=args.batch_size)
 
         for sentence in predictions:
             print("".join(CommonVoiceCs.LETTERS[char]
