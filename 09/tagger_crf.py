@@ -10,7 +10,6 @@ import re
 # Report only TF errors by default
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
-
 parser = argparse.ArgumentParser()
 # These arguments will be set appropriately by ReCodEx, even if you change them.
 parser.add_argument("--batch_size", default=10, type=int, help="Batch size.")
