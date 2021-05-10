@@ -14,7 +14,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=256, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=2,
+parser.add_argument("--epochs", default=10,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=16, type=int,
@@ -23,6 +23,14 @@ parser.add_argument("--rnn_cell_dim", default=32,
                     type=int, help="rnn_cell_dim")
 parser.add_argument("--ctc_beam", default=12,
                     type=int, help="ctc beam")
+parser.add_argument("--dropout", default=0.002, type=float,
+                    help="Dropout regularization.")
+parser.add_argument("--learning_rate", default=0.005,
+                    type=float, help="ctc beam")
+parser.add_argument("--clip_gradient", default=0.1,
+                    type=float, help="Norm for gradient clipping.")
+parser.add_argument(
+    "--hidden_layers", default=[32, 64, 128], nargs="*", type=int, help="Hidden layer sizes.")
 
 use_neptune = True
 if use_neptune:
@@ -67,6 +75,16 @@ class Network(tf.keras.Model):
         predictions = tf.keras.layers.Bidirectional(
             rnn, merge_mode='sum')(inputs)
 
+        for hidden_layer_neurons_count in args.hidden_layers:
+            hidden_layer = tf.keras.layers.Conv2D(
+                hidden_layer_neurons_count, 3, padding='same')
+            predictions = tf.keras.layers.TimeDistributed(
+                hidden_layer)(predictions)
+            predictions = tf.keras.layers.TimeDistributed(
+                tf.keras.layers.BatchNormalization())(predictions)
+            predictions = tf.keras.layers.TimeDistributed(
+                tf.keras.layers.Dropout(rate=args.dropout))(predictions)
+
         output_layer = tf.keras.layers.Dense(1 + len(CommonVoiceCs.LETTERS))
         predictions = tf.keras.layers.TimeDistributed(
             output_layer)(predictions)
@@ -76,7 +94,7 @@ class Network(tf.keras.Model):
 
         # We compile the model without loss, because `train_step` will directly call
         # the `selt.ctc_loss` method.
-        self.compile(optimizer=tf.optimizers.Adam(),
+        self.compile(optimizer=tf.optimizers.Adam(learning_rate=args.learning_rate, global_clipnorm=args.clip_gradient),
                      metrics=[CommonVoiceCs.EditDistanceMetric()])
 
         self.tb_callback = tf.keras.callbacks.TensorBoard(
