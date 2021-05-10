@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from tensorflow.keras.callbacks import Callback
 from common_voice_cs import CommonVoiceCs
 import tensorflow as tf
 import numpy as np
@@ -13,15 +14,31 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=10,
+parser.add_argument("--epochs", default=5,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-parser.add_argument("--threads", default=1, type=int,
+parser.add_argument("--threads", default=16, type=int,
                     help="Maximum number of threads to use.")
 parser.add_argument("--rnn_cell_dim", default=32,
                     type=int, help="rnn_cell_dim")
 parser.add_argument("--ctc_beam", default=12,
                     type=int, help="ctc beam")
+
+use_neptune = False
+if use_neptune:
+    import neptune
+    neptune.init(project_qualified_name='amdalifuk/tagger')
+
+
+class NeptuneCallback(Callback):
+    def on_epoch_end(self, epoch, logs=None):
+        print(self.model.optimizer._decayed_lr(tf.float32))
+        neptune.log_metric('loss', logs['loss'])
+        neptune.log_metric('1-accuracy', 1-logs['accuracy'])
+
+        if 'val_loss' in logs:
+            neptune.log_metric('val_loss', logs['val_loss'])
+            neptune.log_metric('1-val_accuracy', 1-logs['val_accuracy'])
 
 
 class Network(tf.keras.Model):
@@ -83,7 +100,7 @@ class Network(tf.keras.Model):
         # The `tc.nn.ctc_loss` returns a value for a single batch example, so average
         # them to produce a single value and return it.
         single_batch_result = tf.nn.ctc_loss(tf.cast(gold_labels.to_sparse(), dtype=tf.int32), tf.cast(logits.to_tensor(
-        ), dtype=tf.float32), None, tf.cast(logits.row_lengths(), dtype=tf.int32), logits_time_major=False, blank_index=(len(CommonVoiceCs.LETTERS) - 1))
+        ), dtype=tf.float32), None, tf.cast(logits.row_lengths(), dtype=tf.int32), logits_time_major=False, blank_index=0)
 
         return tf.reduce_mean(single_batch_result)
 
@@ -141,6 +158,16 @@ def main(args):
     tf.random.set_seed(args.seed)
     tf.config.threading.set_inter_op_parallelism_threads(args.threads)
     tf.config.threading.set_intra_op_parallelism_threads(args.threads)
+
+    if use_neptune:
+        neptune.create_experiment(params={
+            'batch_size': args.batch_size,
+            'epochs': args.epochs,
+            'rnn_cell_dim': args.rnn_cell_dim,
+            'seed': args.seed,
+            'threads': args.threads,
+        }, abort_callback=lambda: neptune.stop())
+        neptune.send_artifact('speech_recognition.py')
 
     # Create logdir name
     args.logdir = os.path.join("logs", "{}-{}-{}".format(
