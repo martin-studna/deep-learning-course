@@ -81,6 +81,8 @@ class Network(tf.keras.Model):
 
         predictions = tf.keras.layers.TimeDistributed(
             tf.keras.layers.Dropout(rate=args.dropout))(predictions)
+        predictions = tf.keras.layers.TimeDistributed(
+            tf.keras.layers.BatchNormalization())(predictions)
 
         for hidden_layer_neurons_count in args.hidden_layers:
             hidden_layer = tf.keras.layers.Dense(
