@@ -13,7 +13,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=512, type=int, help="Batch size.")
+parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
 parser.add_argument("--epochs", default=4,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
@@ -23,11 +23,11 @@ parser.add_argument("--rnn_cell_dim", default=32,
                     type=int, help="rnn_cell_dim")
 parser.add_argument("--ctc_beam", default=12,
                     type=int, help="ctc beam")
-parser.add_argument("--dropout", default=0.03, type=float,
+parser.add_argument("--dropout", default=0.003, type=float,
                     help="Dropout regularization.")
 parser.add_argument("--l2", default=0.002, type=float,
                     help="L2 regularization.")
-parser.add_argument("--learning_rate", default=0.5,
+parser.add_argument("--learning_rate", default=0.002,
                     type=float, help="ctc beam")
 parser.add_argument("--clip_gradient", default=0.1,
                     type=float, help="Norm for gradient clipping.")
@@ -75,21 +75,27 @@ class Network(tf.keras.Model):
         #   Do not forget to use `tf.keras.layers.TimeDistributed`.
         rnn = tf.keras.layers.LSTM(args.rnn_cell_dim, return_sequences=True)
         predictions = tf.keras.layers.Bidirectional(
-            rnn, merge_mode='sum')(inputs)
+            rnn, merge_mode='sum')(inputs.to_tensor())
+        predictions = tf.RaggedTensor.from_tensor(
+            predictions, inputs.row_lengths())
 
-        for hidden_layer_neurons_count in args.hidden_layers:
-            hidden_layer = tf.keras.layers.Dense(
-                hidden_layer_neurons_count)
-            predictions = tf.keras.layers.TimeDistributed(
-                hidden_layer)(predictions)
-            # predictions = tf.keras.layers.TimeDistributed(
-            #     tf.keras.layers.BatchNormalization())(predictions)
-            # predictions = tf.keras.layers.TimeDistributed(
-            #     tf.keras.layers.Activation('relu'))(predictions)
-            # predictions = tf.keras.layers.TimeDistributed(
-            #     tf.keras.layers.Dropout(rate=args.dropout))(predictions)
+        predictions = tf.keras.layers.TimeDistributed(
+            tf.keras.layers.Dropout(rate=args.dropout))(predictions)
 
-        output_layer = tf.keras.layers.Dense(1 + len(CommonVoiceCs.LETTERS))
+        # for hidden_layer_neurons_count in args.hidden_layers:
+        #     hidden_layer = tf.keras.layers.Dense(
+        #         hidden_layer_neurons_count)
+        #     predictions = tf.keras.layers.TimeDistributed(
+        #         hidden_layer)(predictions)
+        # predictions = tf.keras.layers.TimeDistributed(
+        #     tf.keras.layers.BatchNormalization())(predictions)
+        # predictions = tf.keras.layers.TimeDistributed(
+        #     tf.keras.layers.Activation('relu'))(predictions)
+        # predictions = tf.keras.layers.TimeDistributed(
+        #     tf.keras.layers.Dropout(rate=args.dropout))(predictions)
+
+        output_layer = tf.keras.layers.Dense(
+            1 + len(CommonVoiceCs.LETTERS), kernel_regularizer=tf.keras.regularizers.L1L2(l1=0, l2=args.l2))
         predictions = tf.keras.layers.TimeDistributed(
             output_layer)(predictions)
         logits = predictions
