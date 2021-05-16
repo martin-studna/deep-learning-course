@@ -32,7 +32,7 @@ parser.add_argument("--learning_rate", default=0.002,
 parser.add_argument("--clip_gradient", default=0.1,
                     type=float, help="Norm for gradient clipping.")
 parser.add_argument(
-    "--hidden_layers", default=[100], nargs="*", type=int, help="Hidden layer sizes.")
+    "--hidden_layers", default=[128], nargs="*", type=int, help="Hidden layer sizes.")
 
 use_neptune = True
 if use_neptune:
@@ -79,10 +79,10 @@ class Network(tf.keras.Model):
         predictions = tf.RaggedTensor.from_tensor(
             predictions, inputs.row_lengths())
 
-        predictions = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.Dropout(rate=args.dropout))(predictions)
-        predictions = tf.keras.layers.TimeDistributed(
-            tf.keras.layers.BatchNormalization())(predictions)
+        # predictions = tf.keras.layers.TimeDistributed(
+        #     tf.keras.layers.Dropout(rate=args.dropout))(predictions)
+        # predictions = tf.keras.layers.TimeDistributed(
+        #     tf.keras.layers.BatchNormalization())(predictions)
 
         for hidden_layer_neurons_count in args.hidden_layers:
             hidden_layer = tf.keras.layers.Dense(
