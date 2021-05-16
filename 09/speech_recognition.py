@@ -14,7 +14,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=4,
+parser.add_argument("--epochs", default=20,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=16, type=int,
@@ -32,7 +32,7 @@ parser.add_argument("--learning_rate", default=0.002,
 parser.add_argument("--clip_gradient", default=0.1,
                     type=float, help="Norm for gradient clipping.")
 parser.add_argument(
-    "--hidden_layers", default=[1000], nargs="*", type=int, help="Hidden layer sizes.")
+    "--hidden_layers", default=[100], nargs="*", type=int, help="Hidden layer sizes.")
 
 use_neptune = True
 if use_neptune:
@@ -82,11 +82,11 @@ class Network(tf.keras.Model):
         predictions = tf.keras.layers.TimeDistributed(
             tf.keras.layers.Dropout(rate=args.dropout))(predictions)
 
-        # for hidden_layer_neurons_count in args.hidden_layers:
-        #     hidden_layer = tf.keras.layers.Dense(
-        #         hidden_layer_neurons_count)
-        #     predictions = tf.keras.layers.TimeDistributed(
-        #         hidden_layer)(predictions)
+        for hidden_layer_neurons_count in args.hidden_layers:
+            hidden_layer = tf.keras.layers.Dense(
+                hidden_layer_neurons_count)
+            predictions = tf.keras.layers.TimeDistributed(
+                hidden_layer)(predictions)
         # predictions = tf.keras.layers.TimeDistributed(
         #     tf.keras.layers.BatchNormalization())(predictions)
         # predictions = tf.keras.layers.TimeDistributed(
