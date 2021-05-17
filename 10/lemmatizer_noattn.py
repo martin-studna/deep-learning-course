@@ -8,7 +8,7 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2") # Report only TF errors by de
 import numpy as np
 import tensorflow as tf
 import tensorflow_addons as tfa
-
+from tensorflow import keras
 from morpho_dataset import MorphoDataset
 
 parser = argparse.ArgumentParser()
@@ -36,11 +36,18 @@ class Network(tf.keras.Model):
         # - `self.source_embedding` as an embedding layer of source chars into `args.cle_dim` dimensions
         # - `self.source_rnn` as a bidirectional GRU with `args.rnn_dim` units, returning only the last output,
         #   summing opposite directions
+        self.source_embedding = keras.layers.Embedding(self.source_mapping, args.cle_dim)  #TODO má tu být source mapping?
+        
+        rnn = keras.layers.GRU(args.rnn_dim)
+        self.source_rnn = keras.layers.Bidirectional(rnn, merge_mode='sum')(self.source_embedding)
 
         # TODO: Then define
         # - `self.target_embedding` as an embedding layer of target chars into `args.cle_dim` dimensions
         # - `self.target_rnn_cell` as a GRUCell with `args.rnn_dim` units
         # - `self.target_output_layer` as a Dense layer into as many outputs as there are unique target chars
+        self.target_embedding = keras.layers.Embedding(self.target_mapping, args.cle_dim)
+        self.target_rnn_cell = keras.layers.GRU(args.rnn_dim)(self.target_embedding)
+        self.target_output_layer = keras.layers.Dense(self.target_mapping.get_vocabulary())
 
         # Compile the model
         self.compile(
@@ -60,7 +67,7 @@ class Network(tf.keras.Model):
         @property
         def batch_size(self):
             # TODO: Return the batch size of self.source_states, using tf.shape
-            raise NotImplementedError()
+            raise self.source_states.shape[0]
         @property
         def output_size(self):
             # TODO: Return `tf.TensorShape(number of logits per each output element)`
@@ -140,14 +147,16 @@ class Network(tf.keras.Model):
             target_charseqs = target_charseqs.to_tensor()
 
         # TODO: Embed source_charseqs using `source_embedding`
-
+        source_charseqs = self.source_embedding(source_charseqs)
         # TODO: Run source_rnn on the embedded sequences, returning outputs in `source_states`.
-
+        source_states = source_rnn
         # Run the appropriate decoder
         if targets is not None:
             # TODO: Create a self.DecoderTraining by passing `self` to its constructor.
             # Then run it on `[source_states, target_charseqs]` input,
             # storing the first result in `output` and the third result in `output_lens`.
+            self.DecoderTraining = DecoderTraining(self)
+            output, _, output_lens = self.DecoderTraining.initialize([source_states, target_charseqs])
             raise NotImplementedError()
         else:
             # TODO: Create a self.DecoderPrediction by using:
