@@ -13,21 +13,21 @@ os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 
 # TODO: Define reasonable defaults and optionally more parameters
 parser = argparse.ArgumentParser()
-parser.add_argument("--batch_size", default=64, type=int, help="Batch size.")
-parser.add_argument("--epochs", default=20,
+parser.add_argument("--batch_size", default=16, type=int, help="Batch size.")
+parser.add_argument("--epochs", default=19,
                     type=int, help="Number of epochs.")
 parser.add_argument("--seed", default=42, type=int, help="Random seed.")
 parser.add_argument("--threads", default=16, type=int,
                     help="Maximum number of threads to use.")
-parser.add_argument("--rnn_cell_dim", default=32,
+parser.add_argument("--rnn_cell_dim", default=128,
                     type=int, help="rnn_cell_dim")
-parser.add_argument("--ctc_beam", default=12,
+parser.add_argument("--ctc_beam", default=16,
                     type=int, help="ctc beam")
 parser.add_argument("--dropout", default=0.003, type=float,
                     help="Dropout regularization.")
 parser.add_argument("--l2", default=0.002, type=float,
                     help="L2 regularization.")
-parser.add_argument("--learning_rate", default=0.002,
+parser.add_argument("--learning_rate", default=0.001,
                     type=float, help="ctc beam")
 parser.add_argument("--clip_gradient", default=0.1,
                     type=float, help="Norm for gradient clipping.")
