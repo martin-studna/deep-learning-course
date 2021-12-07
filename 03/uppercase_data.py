@@ -27,6 +27,8 @@ import numpy as np
 #   - alphabet: an alphabet used by `windows`
 #   - batches(size): a generator producing a single epoch of batches of a given
 #       size; the batches are dictionaries with keys "windows" and "labels"
+
+
 class UppercaseData:
     LABELS = 2
 
@@ -49,16 +51,19 @@ class UppercaseData:
                 for char in self._text.lower():
                     freqs[char] = freqs.get(char, 0) + 1
 
-                most_frequent = sorted(freqs.items(), key=lambda item:item[1], reverse=True)
+                most_frequent = sorted(
+                    freqs.items(), key=lambda item: item[1], reverse=True)
                 for i, (char, freq) in enumerate(most_frequent, len(alphabet_map)):
                     alphabet_map[char] = i
-                    if alphabet and len(alphabet_map) >= alphabet: break
+                    if alphabet and len(alphabet_map) >= alphabet:
+                        break
 
             # Remap lowercased input characters using the alphabet_map
             lcletters = np.zeros(self._size + 2 * window, np.int16)
             for i in range(self._size):
                 char = self._text[i].lower()
-                if char not in alphabet_map: char = "<unk>"
+                if char not in alphabet_map:
+                    char = "<unk>"
                 lcletters[i + window] = alphabet_map[char]
 
             # Generate batches data
@@ -74,7 +79,8 @@ class UppercaseData:
             for key, value in alphabet_map.items():
                 self._alphabet[value] = key
 
-            self._shuffler = np.random.RandomState(seed) if shuffle_batches else None
+            self._shuffler = np.random.RandomState(
+                seed) if shuffle_batches else None
 
         @property
         def alphabet(self):
@@ -93,7 +99,8 @@ class UppercaseData:
             return self._size
 
         def batches(self, size=None):
-            permutation = self._shuffler.permutation(self._size) if self._shuffler else np.arange(self._size)
+            permutation = self._shuffler.permutation(
+                self._size) if self._shuffler else np.arange(self._size)
             while len(permutation):
                 batch_size = min(size or np.inf, len(permutation))
                 batch_perm = permutation[:batch_size]
@@ -103,7 +110,6 @@ class UppercaseData:
                 for key in self._data:
                     batch[key] = self._data[key][batch_perm]
                 yield batch
-
 
     def __init__(self, window, alphabet_size=0):
         path = os.path.basename(self._URL)
@@ -148,11 +154,14 @@ class UppercaseData:
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--evaluate", default=None, type=str, help="Prediction file to evaluate")
-    parser.add_argument("--dataset", default="dev", type=str, help="Gold dataset to evaluate")
+    parser.add_argument("--evaluate", default=None, type=str,
+                        help="Prediction file to evaluate")
+    parser.add_argument("--dataset", default="dev", type=str,
+                        help="Gold dataset to evaluate")
     args = parser.parse_args()
 
     if args.evaluate:
         with open(args.evaluate, "r", encoding="utf-8-sig") as predictions_file:
-            accuracy = UppercaseData.evaluate_file(getattr(UppercaseData(0), args.dataset), predictions_file)
+            accuracy = UppercaseData.evaluate_file(
+                getattr(UppercaseData(0), args.dataset), predictions_file)
         print("Uppercase accuracy: {:.2f}%".format(accuracy))
