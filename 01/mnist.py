@@ -4,6 +4,7 @@ import urllib.request
 
 import numpy as np
 
+
 class MNIST:
     H, W, C = 28, 28, 1
     LABELS = 10
@@ -13,10 +14,12 @@ class MNIST:
     class Dataset:
         def __init__(self, data, shuffle_batches, seed=42):
             self._data = data
-            self._data["images"] = self._data["images"].astype(np.float32) / 255
+            self._data["images"] = self._data["images"].astype(
+                np.float32) / 255
             self._size = len(self._data["images"])
 
-            self._shuffler = np.random.RandomState(seed) if shuffle_batches else None
+            self._shuffler = np.random.RandomState(
+                seed) if shuffle_batches else None
 
         @property
         def data(self):
@@ -27,7 +30,8 @@ class MNIST:
             return self._size
 
         def batches(self, size=None):
-            permutation = self._shuffler.permutation(self._size) if self._shuffler else np.arange(self._size)
+            permutation = self._shuffler.permutation(
+                self._size) if self._shuffler else np.arange(self._size)
             while len(permutation):
                 batch_size = min(size or np.inf, len(permutation))
                 batch_perm = permutation[:batch_size]
@@ -42,9 +46,15 @@ class MNIST:
         path = "{}.npz".format(dataset)
         if not os.path.exists(path):
             print("Downloading dataset {}...".format(dataset), file=sys.stderr)
-            urllib.request.urlretrieve("{}/{}".format(self._URL, path), filename=path)
+            urllib.request.urlretrieve(
+                "{}/{}".format(self._URL, path), filename=path)
 
         mnist = np.load(path)
         for dataset in ["train", "dev", "test"]:
-            data = dict((key[len(dataset) + 1:], mnist[key]) for key in mnist if key.startswith(dataset))
-            setattr(self, dataset, self.Dataset(data, shuffle_batches=dataset == "train"))
+            data = dict((key[len(dataset) + 1:], mnist[key])
+                        for key in mnist if key.startswith(dataset))
+            setattr(self, dataset, self.Dataset(
+                data, shuffle_batches=dataset == "train"))
+
+
+MNIST()
